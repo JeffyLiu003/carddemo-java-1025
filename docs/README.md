@@ -21,7 +21,8 @@
 | [design/05-api-catalog.md](design/05-api-catalog.md) | 全部 REST 契约、种子数据契约、错误码总表 |
 | [design/06-traceability-matrix.md](design/06-traceability-matrix.md) | 遗留程序 → 服务 → 接口 → 规则 → 测试 |
 | [design/07-java-conventions.md](design/07-java-conventions.md) | 编码/分层/配置/测试统一基线 |
-| [design/adr/README.md](design/adr/README.md) | 8 个架构决策记录（MADR） |
+| [design/08-marketing-capability.md](design/08-marketing-capability.md) | 营销能力：场景、领域模型、规则、前后台改造 |
+| [design/adr/README.md](design/adr/README.md) | 9 个架构决策记录（MADR） |
 
 ## 3. 运维
 

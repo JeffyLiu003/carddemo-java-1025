@@ -10,7 +10,8 @@ class ApiProxyControllerTest {
 
     private final ApiProxyController controller = new ApiProxyController(
             "http://iam:8081", "http://customer:8082", "http://card:8083",
-            "http://account:8084", "http://transaction:8085", "http://authorization:8086");
+            "http://account:8084", "http://transaction:8085", "http://authorization:8086",
+            "http://marketing:8087");
 
     @Test
     void routesByContextPrefix() {
@@ -30,6 +31,11 @@ class ApiProxyControllerTest {
                 .isEqualTo("http://authorization:8086");
         assertThat(controller.resolveTarget("/api/v1/authorization-purges"))
                 .isEqualTo("http://authorization:8086");
+        assertThat(controller.resolveTarget("/api/v1/campaigns/c1")).isEqualTo("http://marketing:8087");
+        assertThat(controller.resolveTarget("/api/v1/eligibilities")).isEqualTo("http://marketing:8087");
+        assertThat(controller.resolveTarget("/api/v1/reward-evaluations")).isEqualTo("http://marketing:8087");
+        assertThat(controller.resolveTarget("/api/v1/rewards/r1/fulfill")).isEqualTo("http://marketing:8087");
+        assertThat(controller.resolveTarget("/api/v1/marketing/summary")).isEqualTo("http://marketing:8087");
     }
 
     @Test

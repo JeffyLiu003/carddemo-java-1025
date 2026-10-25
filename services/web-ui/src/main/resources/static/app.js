@@ -138,10 +138,18 @@ const NAV_GROUPS = [
         ]
     },
     {
+        title: '营销',
+        items: [
+            { key: 'offers', href: '#/offers', icon: '🎁', label: '活动中心' },
+            { key: 'rewards', href: '#/rewards', icon: '💰', label: '我的奖励' }
+        ]
+    },
+    {
         title: '管理',
         adminOnly: true,
         items: [
-            { key: 'users', href: '#/users', icon: '👥', label: '用户管理' }
+            { key: 'users', href: '#/users', icon: '👥', label: '用户管理' },
+            { key: 'campaigns', href: '#/campaigns', icon: '📣', label: '活动管理' }
         ]
     }
 ];
@@ -305,6 +313,9 @@ function pageMenu() {
         { href: '#/bill-pay', icon: '💸', title: '账单支付', text: '全额还款，实时更新账户余额' },
         { href: '#/reports', icon: '📊', title: '交易报表', text: '按日期区间生成交易明细与合计' },
         { href: '#/authorizations', icon: '🛡️', title: '授权管理', text: '待授权汇总、明细与欺诈标记' },
+        { href: '#/offers', icon: '🎁', title: '活动中心', text: '查看可参与的营销活动并报名' },
+        { href: '#/rewards', icon: '💰', title: '我的奖励', text: '返现与积分记录，失败可重试' },
+        ...(isAdmin ? [{ href: '#/campaigns', icon: '📣', title: '活动管理', text: '新建活动、发布、暂停与效果分析' }] : []),
         ...(isAdmin ? [{ href: '#/users', icon: '👥', title: '用户管理', text: '维护登录用户与管理员账号' }] : [])
     ];
 
@@ -1113,17 +1124,585 @@ async function pageAuthorizations() {
     load(authUi.page);
 }
 
+/* ---------------- 页面：营销 ---------------- */
+
+const campaignsUi = { page: 0, status: '' };
+const rewardsUi = { page: 0 };
+const offersUi = { accountId: '00000000001', cardNumber: '0500024453765740', customerId: '000000001' };
+
+const CAMPAIGN_TYPE_TEXT = {
+    FIRST_PURCHASE_CASHBACK: '首刷返现',
+    CATEGORY_CASHBACK: '类别返现',
+    POINTS_MULTIPLIER: '积分倍数'
+};
+const CAMPAIGN_STATUS_TEXT = { DRAFT: '草稿', ACTIVE: '进行中', PAUSED: '已暂停', ENDED: '已结束' };
+const REWARD_STATUS_TEXT = { GRANTED: '已发放', PENDING: '待入账', FAILED: '失败' };
+const ELIGIBILITY_REASON_TEXT = {
+    CAMPAIGN_NOT_ACTIVE: '活动未生效',
+    NOT_ACTIVE: '活动未生效',
+    ACCOUNT_NOT_FOUND: '账户不存在',
+    ACCOUNT_INACTIVE: '账户已停用',
+    ACCOUNT_GROUP_MISMATCH: '不在活动目标客群',
+    CATEGORY_MISMATCH: '交易类别不符',
+    AMOUNT_TOO_LOW: '未达最低消费金额',
+    NOT_ENROLLED: '需要先报名',
+    CARD_LIMIT_REACHED: '已达活动参与次数上限',
+    FIRST_PURCHASE_ALREADY_REWARDED: '已享受过首刷礼',
+    BUDGET_EXHAUSTED: '活动预算已用完',
+    REWARD_ZERO: '奖励金额为 0',
+    ALREADY_EVALUATED: '该交易已评估过'
+};
+
+const reasonText = (reason) => (reason ? (ELIGIBILITY_REASON_TEXT[reason] || reason) : '');
+
+function campaignStatusBadge(status) {
+    const cls = status === 'ACTIVE' ? 'ok' : status === 'PAUSED' ? 'warn'
+        : status === 'DRAFT' ? 'neutral' : 'bad';
+    return `<span class="badge ${cls}">${CAMPAIGN_STATUS_TEXT[status] || esc(status)}</span>`;
+}
+
+function rewardStatusBadge(status) {
+    const cls = status === 'GRANTED' ? 'ok' : status === 'PENDING' ? 'warn' : 'bad';
+    return `<span class="badge ${cls}">${REWARD_STATUS_TEXT[status] || esc(status)}</span>`;
+}
+
+function campaignRewardText(campaign) {
+    if (campaign.campaignType === 'POINTS_MULTIPLIER') {
+        return `${campaign.pointsMultiplier} 倍积分`;
+    }
+    if (campaign.fixedRewardAmount && Number(campaign.fixedRewardAmount) > 0) {
+        return `返现 ${money(campaign.fixedRewardAmount)}`;
+    }
+    if (campaign.rewardRate) {
+        const percent = (Number(campaign.rewardRate) * 100).toFixed(2).replace(/\.?0+$/, '');
+        return `${percent}% 返现${campaign.maxRewardPerTransaction
+            ? `（单笔上限 ${money(campaign.maxRewardPerTransaction)}）` : ''}`;
+    }
+    return '—';
+}
+
+/* ---------------- 页面：活动中心 ---------------- */
+
+function pageOffers() {
+    shell({
+        active: 'offers',
+        title: '活动中心',
+        subtitle: '查看当前可参与的营销活动，报名后消费达标自动返现/积分',
+        content: `
+            <div class="card">
+                <form class="inline-form" id="offers-form">
+                    <label class="field grow"><span>账户号（11 位）</span>
+                        <input id="offers-account" value="${esc(offersUi.accountId)}" maxlength="11" pattern="\\d{11}" required></label>
+                    <label class="field grow"><span>卡号（16 位）</span>
+                        <input id="offers-card" value="${esc(offersUi.cardNumber)}" maxlength="16" pattern="\\d{16}" required></label>
+                    <label class="field grow"><span>客户号（可选）</span>
+                        <input id="offers-customer" value="${esc(offersUi.customerId)}" maxlength="9" pattern="\\d{9}"></label>
+                    <button class="btn primary" type="submit">查询活动</button>
+                </form>
+                <div id="offers-result"></div>
+            </div>`
+    });
+
+    const form = document.getElementById('offers-form');
+    const box = document.getElementById('offers-result');
+
+    const load = async () => {
+        offersUi.accountId = document.getElementById('offers-account').value.trim();
+        offersUi.cardNumber = document.getElementById('offers-card').value.trim();
+        offersUi.customerId = document.getElementById('offers-customer').value.trim();
+        const params = new URLSearchParams({
+            accountId: offersUi.accountId,
+            cardNumber: offersUi.cardNumber
+        });
+        if (offersUi.customerId) params.set('customerId', offersUi.customerId);
+        box.innerHTML = '<div class="empty">加载中…</div>';
+        try {
+            const result = await api(`/api/v1/eligibilities?${params.toString()}`);
+            const items = result.items || [];
+            box.innerHTML = items.length === 0
+                ? '<div class="empty">当前没有可参与的活动</div>'
+                : `<div class="grid cols-2 mt-16">${items.map(offerCard).join('')}</div>`;
+
+            box.querySelectorAll('[data-enroll]').forEach((button) => {
+                button.addEventListener('click', async () => {
+                    const campaignId = button.dataset.enroll;
+                    setBusy(button, true, '报名中…');
+                    try {
+                        await api(`/api/v1/campaigns/${encodeURIComponent(campaignId)}/enrollments`, {
+                            method: 'POST',
+                            body: {
+                                cardNumber: offersUi.cardNumber,
+                                accountId: offersUi.accountId,
+                                customerId: offersUi.customerId || null
+                            }
+                        });
+                        toast('报名成功，消费达标后自动返现', 'success');
+                        await load();
+                    } catch (error) {
+                        toast(`${error.code || '报名失败'}：${error.message}`, 'error');
+                        setBusy(button, false);
+                    }
+                });
+            });
+        } catch (error) {
+            box.innerHTML = errBox(error);
+        }
+    };
+
+    form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        load();
+    });
+    load();
+}
+
+function offerCard(offer) {
+    const needsEnrollment = offer.enrollmentRequired && !offer.enrolled;
+    const enrolledBadge = offer.enrolled
+        ? '<span class="badge ok">已报名</span>'
+        : needsEnrollment
+            ? '<span class="badge warn">需报名</span>'
+            : offer.eligible
+                ? '<span class="badge neutral">可参与</span>'
+                : '<span class="badge warn">暂不可参与</span>';
+    const action = needsEnrollment
+        ? `<div class="alert info" style="margin:14px 0 0">该活动需要报名，报名后消费达标即可获得奖励。</div>
+           <div class="form-actions"><button class="btn primary small" data-enroll="${esc(offer.campaignId)}">立即报名</button></div>`
+        : !offer.eligible
+            ? `<div class="alert info" style="margin:14px 0 0">${esc(reasonText(offer.reason))}</div>`
+            : '<div class="hint mt-16">已满足参与条件，达标消费会自动发放奖励。</div>';
+    return `
+        <div class="card">
+            <div class="section-title">
+                <h3>${esc(offer.name)}</h3>${enrolledBadge}
+            </div>
+            <p class="muted" style="margin:0 0 12px">${esc(offer.description || '')}</p>
+            <dl class="dl">
+                <dt>奖励</dt><dd><strong>${esc(offer.rewardSummary)}</strong></dd>
+                <dt>有效期</dt><dd>${dateText(offer.startAt)} ~ ${dateText(offer.endAt)}</dd>
+                <dt>参与门槛</dt><dd>单笔 ≥ ${money(offer.minTransactionAmount)}${offer.categoryCode
+                    ? ` · 类别 ${esc(offer.categoryCode)}` : ''}</dd>
+                <dt>次数限制</dt><dd>${offer.maxRewardsPerCard ? `每卡 ${offer.maxRewardsPerCard} 次` : '不限'}</dd>
+                <dt>报名要求</dt><dd>${offer.enrollmentRequired ? '需要报名' : '无需报名'}</dd>
+                ${offer.remainingBudget !== null && offer.remainingBudget !== undefined
+                    ? `<dt>剩余预算</dt><dd>${money(offer.remainingBudget)}</dd>` : ''}
+            </dl>
+            ${action}
+        </div>`;
+}
+
+/* ---------------- 页面：我的奖励 ---------------- */
+
+function pageRewards() {
+    shell({
+        active: 'rewards',
+        title: '我的奖励',
+        subtitle: '返现与积分发放记录；待入账的返现可重试',
+        content: `
+            <div class="card">
+                <form class="inline-form" id="rewards-form">
+                    <label class="field grow"><span>账户号</span>
+                        <input id="rewards-account" value="${esc(offersUi.accountId)}" maxlength="11" pattern="\\d{11}"></label>
+                    <label class="field grow"><span>卡号（可选）</span>
+                        <input id="rewards-card" value="${esc(offersUi.cardNumber)}" maxlength="16" pattern="\\d{16}"></label>
+                    <button class="btn primary" type="submit">查询奖励</button>
+                </form>
+                <div id="rewards-result"></div>
+            </div>`
+    });
+
+    const form = document.getElementById('rewards-form');
+    const box = document.getElementById('rewards-result');
+
+    const load = async (page) => {
+        rewardsUi.page = Math.max(0, page);
+        const accountId = document.getElementById('rewards-account').value.trim();
+        const cardNumber = document.getElementById('rewards-card').value.trim();
+        const params = new URLSearchParams({ page: String(rewardsUi.page), size: '10' });
+        if (accountId) params.set('accountId', accountId);
+        if (cardNumber) params.set('cardNumber', cardNumber);
+        box.innerHTML = '<div class="empty">加载中…</div>';
+        try {
+            const result = await api(`/api/v1/rewards?${params.toString()}`);
+            const items = result.items || [];
+            box.innerHTML = `
+                ${items.length === 0 ? '<div class="empty">暂无奖励记录</div>' : `
+                <div class="table-wrap mt-16"><table class="table">
+                    <thead><tr><th>时间</th><th>活动</th><th>交易号</th><th>奖励</th>
+                        <th>状态</th><th>说明</th><th>操作</th></tr></thead>
+                    <tbody>${items.map((reward) => `
+                        <tr>
+                            <td class="nowrap">${dateTimeText(reward.createdAt)}</td>
+                            <td>${esc(reward.campaignName)}</td>
+                            <td class="mono">${reward.transactionId
+                                ? `<a href="#/transactions/${encodeURIComponent(reward.transactionId)}">${esc(reward.transactionId)}</a>`
+                                : '—'}</td>
+                            <td>${reward.rewardType === 'CASHBACK'
+                                ? `返现 <strong>${money(reward.rewardAmount)}</strong>`
+                                : `积分 <strong>${esc(reward.rewardPoints)}</strong>`}</td>
+                            <td>${rewardStatusBadge(reward.status)}</td>
+                            <td class="muted">${esc(reward.failureReason || '—')}</td>
+                            <td>${reward.status === 'PENDING'
+                                ? `<button class="btn ghost small" data-retry="${esc(reward.rewardId)}">重试入账</button>`
+                                : '—'}</td>
+                        </tr>`).join('')}
+                    </tbody></table></div>`}
+                ${pager(rewardsUi.page, result.size || 10, result.total || 0)}`;
+
+            box.querySelectorAll('[data-page]').forEach((button) => {
+                button.addEventListener('click', () =>
+                    load(rewardsUi.page + (button.dataset.page === 'next' ? 1 : -1)));
+            });
+            box.querySelectorAll('[data-retry]').forEach((button) => {
+                button.addEventListener('click', async () => {
+                    setBusy(button, true, '处理中…');
+                    try {
+                        await api(`/api/v1/rewards/${encodeURIComponent(button.dataset.retry)}/fulfill`,
+                            { method: 'POST' });
+                        toast('返现已入账', 'success');
+                        await load(rewardsUi.page);
+                    } catch (error) {
+                        toast(`${error.code || '重试失败'}：${error.message}`, 'error');
+                        setBusy(button, false);
+                    }
+                });
+            });
+        } catch (error) {
+            box.innerHTML = errBox(error);
+        }
+    };
+
+    form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        load(0);
+    });
+    load(rewardsUi.page);
+}
+
+/* ---------------- 页面：活动管理 ---------------- */
+
+function pageCampaigns() {
+    if (!requireAdmin('campaigns', '活动管理')) return;
+    shell({
+        active: 'campaigns',
+        title: '活动管理',
+        subtitle: '创建、发布、暂停活动并查看效果（管理员）',
+        content: `
+            <div class="card">
+                <div class="section-title">
+                    <form class="inline-form" id="campaigns-filter">
+                        <label class="field"><span>状态</span>
+                            <select id="campaigns-status">
+                                <option value="">全部</option>
+                                <option value="DRAFT">草稿</option>
+                                <option value="ACTIVE">进行中</option>
+                                <option value="PAUSED">已暂停</option>
+                                <option value="ENDED">已结束</option>
+                            </select></label>
+                        <button class="btn ghost" type="submit">筛选</button>
+                    </form>
+                    <a class="btn primary small" href="#/campaigns/new">新建活动</a>
+                </div>
+                <div id="campaigns-result"></div>
+            </div>`
+    });
+
+    const box = document.getElementById('campaigns-result');
+    const filter = document.getElementById('campaigns-filter');
+
+    const load = async (page) => {
+        campaignsUi.page = Math.max(0, page);
+        campaignsUi.status = document.getElementById('campaigns-status').value;
+        const params = new URLSearchParams({ page: String(campaignsUi.page), size: '10' });
+        if (campaignsUi.status) params.set('status', campaignsUi.status);
+        box.innerHTML = '<div class="empty">加载中…</div>';
+        try {
+            const result = await api(`/api/v1/campaigns?${params.toString()}`);
+            const items = result.items || [];
+            box.innerHTML = `
+                ${items.length === 0 ? '<div class="empty">暂无活动</div>' : `
+                <div class="table-wrap"><table class="table">
+                    <thead><tr><th>活动</th><th>类型</th><th>奖励</th><th>期间</th><th>状态</th>
+                        <th class="num">预算使用</th><th>操作</th></tr></thead>
+                    <tbody>${items.map((campaign) => {
+                        const used = Number(campaign.consumedAmount || 0);
+                        const budget = Number(campaign.budget || 0);
+                        const percent = budget > 0 ? ((used / budget) * 100).toFixed(1) : '—';
+                        return `
+                        <tr>
+                            <td><a href="#/campaigns/${encodeURIComponent(campaign.campaignId)}">${esc(campaign.name)}</a>
+                                ${campaign.enrollmentRequired ? '<span class="badge neutral">需报名</span>' : ''}</td>
+                            <td>${esc(CAMPAIGN_TYPE_TEXT[campaign.campaignType] || campaign.campaignType)}</td>
+                            <td>${esc(campaign.rewardSummary)}</td>
+                            <td class="nowrap">${dateText(campaign.startAt)} ~ ${dateText(campaign.endAt)}</td>
+                            <td>${campaignStatusBadge(campaign.status)}</td>
+                            <td class="num">${money(used)} / ${money(budget)}${budget > 0 ? `（${percent}%）` : ''}</td>
+                            <td class="actions">
+                                <a class="btn ghost small" href="#/campaigns/${encodeURIComponent(campaign.campaignId)}">详情</a>
+                                ${campaign.status === 'DRAFT'
+                                    ? `<button class="btn primary small" data-transition="activate" data-id="${esc(campaign.campaignId)}">发布</button>`
+                                    : campaign.status === 'ACTIVE'
+                                        ? `<button class="btn ghost small" data-transition="pause" data-id="${esc(campaign.campaignId)}">暂停</button>`
+                                        : ''}
+                            </td>
+                        </tr>`;
+                    }).join('')}
+                    </tbody></table></div>`}
+                ${pager(campaignsUi.page, result.size || 10, result.total || 0)}`;
+
+            box.querySelectorAll('[data-page]').forEach((button) => {
+                button.addEventListener('click', () =>
+                    load(campaignsUi.page + (button.dataset.page === 'next' ? 1 : -1)));
+            });
+            box.querySelectorAll('[data-transition]').forEach((button) => {
+                button.addEventListener('click', async () => {
+                    setBusy(button, true, '处理中…');
+                    try {
+                        await api(`/api/v1/campaigns/${encodeURIComponent(button.dataset.id)}/${button.dataset.transition}`,
+                            { method: 'POST' });
+                        toast('操作成功', 'success');
+                        await load(campaignsUi.page);
+                    } catch (error) {
+                        toast(`${error.code || '操作失败'}：${error.message}`, 'error');
+                        setBusy(button, false);
+                    }
+                });
+            });
+        } catch (error) {
+            box.innerHTML = errBox(error);
+        }
+    };
+
+    filter.addEventListener('submit', (event) => {
+        event.preventDefault();
+        load(0);
+    });
+    load(campaignsUi.page);
+}
+
+function campaignFormHtml(campaign = {}) {
+    const start = campaign.startAt ? String(campaign.startAt).slice(0, 16) : '2026-11-01T00:00';
+    const end = campaign.endAt ? String(campaign.endAt).slice(0, 16) : '2026-11-30T23:59';
+    const value = (v) => (v === null || v === undefined ? '' : v);
+    return `
+        <div class="form-grid">
+            <label class="field span-2"><span>活动名称 <span class="req">*</span></span>
+                <input name="name" value="${esc(value(campaign.name))}" maxlength="80" required></label>
+            <label class="field span-2"><span>描述</span>
+                <input name="description" value="${esc(value(campaign.description))}" maxlength="300"></label>
+            <label class="field"><span>活动类型 <span class="req">*</span></span>
+                <select name="campaignType">
+                    ${Object.entries(CAMPAIGN_TYPE_TEXT).map(([key, label]) => `
+                        <option value="${key}" ${campaign.campaignType === key ? 'selected' : ''}>${label}</option>`).join('')}
+                </select></label>
+            <label class="field"><span>目标账户组（可选）</span>
+                <input name="targetGroupId" value="${esc(value(campaign.targetGroupId))}" maxlength="10" placeholder="如 A000000000"></label>
+            <label class="field"><span>开始时间 <span class="req">*</span></span>
+                <input name="startAt" type="datetime-local" value="${esc(start)}" required></label>
+            <label class="field"><span>结束时间 <span class="req">*</span></span>
+                <input name="endAt" type="datetime-local" value="${esc(end)}" required></label>
+            <label class="field"><span>交易类别（可选）</span>
+                <input name="categoryCode" value="${esc(value(campaign.categoryCode))}" maxlength="4" placeholder="如 0001"></label>
+            <label class="field"><span>最低交易金额</span>
+                <input name="minTransactionAmount" type="number" step="0.01" min="0" value="${value(campaign.minTransactionAmount) || 0}"></label>
+            <label class="field"><span>返现率（0.05 = 5%）</span>
+                <input name="rewardRate" type="number" step="0.0001" min="0" value="${value(campaign.rewardRate)}"></label>
+            <label class="field"><span>固定返现额</span>
+                <input name="fixedRewardAmount" type="number" step="0.01" min="0" value="${value(campaign.fixedRewardAmount)}"></label>
+            <label class="field"><span>单笔返现上限</span>
+                <input name="maxRewardPerTransaction" type="number" step="0.01" min="0" value="${value(campaign.maxRewardPerTransaction)}"></label>
+            <label class="field"><span>每卡最多奖励次数</span>
+                <input name="maxRewardsPerCard" type="number" min="1" value="${value(campaign.maxRewardsPerCard)}"></label>
+            <label class="field"><span>积分倍数</span>
+                <input name="pointsMultiplier" type="number" step="0.1" min="0" value="${value(campaign.pointsMultiplier)}"></label>
+            <label class="field"><span>预算（返现活动必填）</span>
+                <input name="budget" type="number" step="0.01" min="0" value="${value(campaign.budget) || 0}"></label>
+            <label class="checkbox span-2">
+                <input type="checkbox" name="enrollmentRequired" ${campaign.enrollmentRequired ? 'checked' : ''}>
+                需要用户报名后参与
+            </label>
+        </div>
+        <div class="hint mt-16">
+            类型规则：首刷礼需固定返现额；类别返现需返现率或固定额，且预算 &gt; 0；积分倍数活动需倍数。
+            只有草稿状态可以编辑规则。
+        </div>`;
+}
+
+function campaignPayload(form) {
+    const values = formValues(form);
+    const numberOrNull = (raw) => (raw === '' || raw === null || raw === undefined ? null : Number(raw));
+    return {
+        name: values.name.trim(),
+        description: values.description ? values.description.trim() : null,
+        campaignType: values.campaignType,
+        startAt: values.startAt,
+        endAt: values.endAt,
+        targetGroupId: values.targetGroupId ? values.targetGroupId.trim() : null,
+        categoryCode: values.categoryCode ? values.categoryCode.trim() : null,
+        minTransactionAmount: numberOrNull(values.minTransactionAmount),
+        rewardRate: numberOrNull(values.rewardRate),
+        fixedRewardAmount: numberOrNull(values.fixedRewardAmount),
+        maxRewardPerTransaction: numberOrNull(values.maxRewardPerTransaction),
+        maxRewardsPerCard: numberOrNull(values.maxRewardsPerCard),
+        budget: numberOrNull(values.budget),
+        pointsMultiplier: numberOrNull(values.pointsMultiplier),
+        enrollmentRequired: form.querySelector('[name="enrollmentRequired"]').checked
+    };
+}
+
+function pageCampaignNew() {
+    if (!requireAdmin('campaigns', '活动管理')) return;
+    shell({
+        active: 'campaigns',
+        title: '新建活动',
+        subtitle: '创建后为草稿状态，发布后才对用户可见',
+        content: `
+            <div class="card">
+                <form id="campaign-form">
+                    ${campaignFormHtml({})}
+                    <div class="form-actions">
+                        <button class="btn primary" type="submit" id="campaign-save">创建草稿</button>
+                        <a class="btn ghost" href="#/campaigns">返回列表</a>
+                    </div>
+                    <div id="campaign-msg"></div>
+                </form>
+            </div>`
+    });
+
+    const form = document.getElementById('campaign-form');
+    const button = document.getElementById('campaign-save');
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const msg = document.getElementById('campaign-msg');
+        msg.innerHTML = '';
+        setBusy(button, true, '创建中…');
+        try {
+            const created = await api('/api/v1/campaigns', { method: 'POST', body: campaignPayload(form) });
+            toast('活动已创建（草稿）', 'success');
+            location.hash = `#/campaigns/${created.campaignId}`;
+        } catch (error) {
+            msg.innerHTML = errBox(error);
+            setBusy(button, false);
+        }
+    });
+}
+
+async function pageCampaignDetail(campaignId) {
+    if (!requireAdmin('campaigns', '活动管理')) return;
+    shell({
+        active: 'campaigns',
+        title: '活动详情',
+        subtitle: campaignId,
+        content: '<div class="card" id="campaign-detail"><div class="empty">加载中…</div></div>'
+    });
+    const box = document.getElementById('campaign-detail');
+    try {
+        const [campaign, performance] = await Promise.all([
+            api(`/api/v1/campaigns/${encodeURIComponent(campaignId)}`),
+            api(`/api/v1/campaigns/${encodeURIComponent(campaignId)}/performance`)
+        ]);
+        const percent = (value) => `${(Number(value || 0) * 100).toFixed(2)}%`;
+        const canActivate = campaign.status === 'DRAFT' || campaign.status === 'PAUSED';
+        const canPause = campaign.status === 'ACTIVE';
+        const canEnd = campaign.status === 'ACTIVE' || campaign.status === 'PAUSED';
+
+        box.innerHTML = `
+            <div class="section-title">
+                <h3>${esc(campaign.name)} ${campaignStatusBadge(campaign.status)}</h3>
+                <div class="actions">
+                    ${canActivate ? `<button class="btn primary small" data-transition="activate">${campaign.status === 'DRAFT' ? '发布活动' : '恢复活动'}</button>` : ''}
+                    ${canPause ? '<button class="btn ghost small" data-transition="pause">暂停</button>' : ''}
+                    ${canEnd ? '<button class="btn danger small" data-transition="end">结束活动</button>' : ''}
+                </div>
+            </div>
+            <p class="muted" style="margin:0 0 16px">${esc(campaign.description || '')}</p>
+
+            <div class="grid cols-4 mb-16">
+                <div class="stat"><div class="label">报名人数</div><div class="value">${performance.enrolledCount}</div></div>
+                <div class="stat"><div class="label">已发奖励</div><div class="value">${performance.grantedCount}
+                    <small>待入账 ${performance.pendingCount}</small></div></div>
+                <div class="stat"><div class="label">返现成本</div><div class="value">${money(performance.cashbackTotal)}</div></div>
+                <div class="stat"><div class="label">预算使用率</div><div class="value">${percent(performance.budgetUtilization)}</div></div>
+            </div>
+
+            <dl class="dl mb-16">
+                <dt>活动类型</dt><dd>${esc(CAMPAIGN_TYPE_TEXT[campaign.campaignType] || campaign.campaignType)}</dd>
+                <dt>奖励规则</dt><dd>${esc(campaignRewardText(campaign))}</dd>
+                <dt>有效期</dt><dd>${dateTimeText(campaign.startAt)} ~ ${dateTimeText(campaign.endAt)}</dd>
+                <dt>目标账户组</dt><dd>${esc(campaign.targetGroupId || '全部账户')}</dd>
+                <dt>交易类别</dt><dd>${esc(campaign.categoryCode || '不限')}</dd>
+                <dt>最低金额 / 每卡次数</dt>
+                    <dd>${money(campaign.minTransactionAmount)} / ${campaign.maxRewardsPerCard || '不限'}</dd>
+                <dt>预算 / 已消耗</dt><dd>${money(campaign.budget)} / ${money(campaign.consumedAmount)}</dd>
+                <dt>报名要求</dt><dd>${campaign.enrollmentRequired ? '需要报名' : '无需报名'}</dd>
+                <dt>转化率</dt><dd>${percent(performance.conversionRate)}（已发奖励 / 报名人数）</dd>
+            </dl>
+
+            ${campaign.status === 'DRAFT' ? `
+            <div class="card" style="box-shadow:none">
+                <h3>编辑规则 <span class="muted">仅草稿可编辑</span></h3>
+                <form id="campaign-form">
+                    ${campaignFormHtml(campaign)}
+                    <div class="form-actions">
+                        <button class="btn primary" type="submit" id="campaign-save">保存修改</button>
+                    </div>
+                    <div id="campaign-msg"></div>
+                </form>
+            </div>` : '<div class="alert info">活动已发布，规则不可再编辑；如需调整请新建活动。</div>'}
+            <div class="form-actions"><a class="btn ghost" href="#/campaigns">返回列表</a></div>`;
+
+        box.querySelectorAll('[data-transition]').forEach((button) => {
+            button.addEventListener('click', async () => {
+                setBusy(button, true, '处理中…');
+                try {
+                    await api(`/api/v1/campaigns/${encodeURIComponent(campaignId)}/${button.dataset.transition}`,
+                        { method: 'POST' });
+                    toast('操作成功', 'success');
+                    await pageCampaignDetail(campaignId);
+                } catch (error) {
+                    toast(`${error.code || '操作失败'}：${error.message}`, 'error');
+                    setBusy(button, false);
+                }
+            });
+        });
+
+        const form = document.getElementById('campaign-form');
+        if (form) {
+            const saveButton = document.getElementById('campaign-save');
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const msg = document.getElementById('campaign-msg');
+                msg.innerHTML = '';
+                setBusy(saveButton, true, '保存中…');
+                try {
+                    await api(`/api/v1/campaigns/${encodeURIComponent(campaignId)}`, {
+                        method: 'PUT',
+                        body: campaignPayload(form)
+                    });
+                    toast('活动已更新', 'success');
+                    await pageCampaignDetail(campaignId);
+                } catch (error) {
+                    msg.innerHTML = errBox(error);
+                    setBusy(saveButton, false);
+                }
+            });
+        }
+    } catch (error) {
+        box.innerHTML = errBox(error);
+    }
+}
+
 /* ---------------- 页面：用户管理 ---------------- */
 
 const usersUi = { page: 0 };
 
-function requireAdmin() {
+function requireAdmin(active = 'users', title = '用户管理') {
     if (state.session.user.userType !== 'A') {
         shell({
-            active: 'users',
-            title: '用户管理',
+            active,
+            title,
             subtitle: '仅管理员可访问',
-            content: '<div class="alert error">当前账号不是管理员，无法访问用户管理。请使用 ADMIN001 登录。</div>'
+            content: '<div class="alert error">当前账号不是管理员，无法访问该页面。请使用 ADMIN001 登录。</div>'
         });
         return false;
     }
@@ -1364,6 +1943,12 @@ function route() {
     if (segments[0] === 'bill-pay') return pageBillPay();
     if (segments[0] === 'reports') return pageReports();
     if (segments[0] === 'authorizations') return pageAuthorizations();
+    if (segments[0] === 'offers') return pageOffers();
+    if (segments[0] === 'rewards') return pageRewards();
+    if (segments[0] === 'campaigns') {
+        if (segments[1] === 'new') return pageCampaignNew();
+        return segments[1] ? pageCampaignDetail(segments[1]) : pageCampaigns();
+    }
     if (segments[0] === 'users') {
         if (segments[1] === 'new') return pageUserNew();
         return segments[1] ? pageUserEdit(segments[1]) : pageUsers();

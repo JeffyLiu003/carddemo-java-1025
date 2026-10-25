@@ -2,7 +2,7 @@
 
 > 所有服务遵循 `docs/design/07-java-conventions.md`。基础路径 `/api/v1`，JSON，UTF-8。
 > 面向业务人员的界面：`http://localhost:8090/`（web-ui 托管 SPA 并同源代理全部 `/api/**`）。
-> 每个服务提供 Swagger UI（根路径自动跳转）：`http://localhost:8081/` … `http://localhost:8086/`，
+> 每个服务提供 Swagger UI（根路径自动跳转）：`http://localhost:8081/` … `http://localhost:8087/`，
 > 登录请求体已预填 `ADMIN001/admin123`；OpenAPI 描述位于 `/v3/api-docs`。
 > 列表响应统一 `{"items": [...], "page": 0, "size": 10, "total": 42}`。
 > 错误响应统一 `{"code": "...", "message": "...", "details": [...]}`，HTTP 语义见规范 §4。
@@ -534,7 +534,105 @@
 
 ---
 
-## 7. 错误码总表
+## 7. marketing-service（:8087，新增能力）
+
+### 7.1 活动
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/v1/campaigns?status=&page=&size=` | 活动列表（`status`：DRAFT/ACTIVE/PAUSED/ENDED） |
+| GET | `/api/v1/campaigns/{id}` | 活动详情 |
+| POST | `/api/v1/campaigns` | 新建（DRAFT） |
+| PUT | `/api/v1/campaigns/{id}` | 编辑（仅 DRAFT，类型与计价字段需匹配） |
+| POST | `/api/v1/campaigns/{id}/activate` `/pause` `/end` | 状态迁移 |
+| GET | `/api/v1/campaigns/{id}/performance` | 报名数/发奖数/返现成本/预算使用率/转化率 |
+| POST | `/api/v1/campaigns/{id}/enrollments` | 报名（同活动同卡幂等） |
+| GET | `/api/v1/campaigns/{id}/enrollments?page=&size=` | 报名列表 |
+
+创建请求示例（类别返现）：
+
+```json
+{
+  "name": "周末餐饮 8% 返现",
+  "description": "周末餐饮消费返现",
+  "campaignType": "CATEGORY_CASHBACK",
+  "startAt": "2026-11-01T00:00:00",
+  "endAt": "2026-11-30T23:59:59",
+  "categoryCode": "0001",
+  "minTransactionAmount": 50.00,
+  "rewardRate": 0.0800,
+  "maxRewardPerTransaction": 40.00,
+  "maxRewardsPerCard": 3,
+  "budget": 5000.00,
+  "enrollmentRequired": true
+}
+```
+
+`201` 返回活动（`status=DRAFT`）。类型校验：`FIRST_PURCHASE_CASHBACK` 需 `fixedRewardAmount>0`；
+`CATEGORY_CASHBACK` 需 `rewardRate>0` 或 `fixedRewardAmount>0`，且 `budget>0`；`POINTS_MULTIPLIER` 需 `pointsMultiplier>0`。
+非法请求返回 `409 INVALID_CAMPAIGN_RULE` / `BUDGET_REQUIRED`；非法状态迁移返回 `409 INVALID_CAMPAIGN_STATE`；
+过期活动发布返回 `409 CAMPAIGN_EXPIRED`。
+
+活动效果响应：
+
+```json
+{"campaignId": "...", "enrolledCount": 2, "rewardCount": 3, "grantedCount": 2,
+ "pendingCount": 1, "failedCount": 0, "cashbackTotal": 46.00, "pointsTotal": 0,
+ "budget": 10000.00, "consumedAmount": 46.00, "budgetUtilization": 0.0046,
+ "conversionRate": 1.0000}
+```
+
+### 7.2 活动中心与奖励
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/v1/eligibilities?cardNumber=&accountId=&customerId=` | 当前有效活动、是否已报名、资格原因 |
+| POST | `/api/v1/reward-evaluations` | 奖励评估（交易入账后调用，幂等） |
+| GET | `/api/v1/rewards?accountId=&cardNumber=&campaignId=&page=&size=` | 奖励记录 |
+| POST | `/api/v1/rewards/{rewardId}/fulfill` | 待入账返现重试（幂等） |
+| GET | `/api/v1/marketing/summary` | 看板汇总（有效活动数/已发奖励/返现总额/积分/待处理） |
+
+活动中心响应示例：
+
+```json
+{"items": [{
+  "campaignId": "c0000000-0000-0000-0000-000000000002",
+  "name": "餐饮消费 5% 返现", "campaignType": "CATEGORY_CASHBACK",
+  "rewardSummary": "5% 返现，单笔上限 30.00", "rewardType": "CASHBACK",
+  "rewardRate": 0.0500, "minTransactionAmount": 50.00, "maxRewardsPerCard": 5,
+  "categoryCode": "0001", "startAt": "2026-09-01T00:00", "endAt": "2026-12-31T23:59:59",
+  "remainingBudget": 10000.00, "enrollmentRequired": true,
+  "enrolled": false, "eligible": false, "reason": "NOT_ENROLLED"
+}]}
+```
+
+奖励评估请求：
+
+```json
+{"transactionId": "0000000000000777", "cardNumber": "3344556677889900",
+ "accountId": "00000000006", "customerId": "000000006", "amount": 120.00,
+ "categoryCode": "0001", "typeCode": "01", "description": "Dinner",
+ "processedAt": "2026-10-25T19:30:00"}
+```
+
+响应 `{"grants": [...], "skipped": [{"campaignId","campaignName","reason"}]}`；
+`reason` 取值：`ALREADY_EVALUATED`、`NOT_ENROLLED`、`CATEGORY_MISMATCH`、`AMOUNT_TOO_LOW`、
+`CARD_LIMIT_REACHED`、`FIRST_PURCHASE_ALREADY_REWARDED`、`BUDGET_EXHAUSTED`、`ACCOUNT_INACTIVE`、
+`ACCOUNT_GROUP_MISMATCH`、`ACCOUNT_NOT_FOUND`。
+
+### 7.3 account-service 返现入账（新增）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/v1/accounts/{accountId}/cashback-credits` | 营销返现入账，`rewardId` 幂等冲减欠款 |
+
+```json
+{"rewardId": "7c1f0d4e-...", "campaignId": "c0000000-...", "amount": 6.00}
+```
+
+`200` 返回账户；同一 `rewardId` 重复调用不重复入账；金额 ≤ 0 返回 `409 INVALID_CASHBACK_AMOUNT`。
+
+## 8. 错误码总表
 
 | code | HTTP | 归属 | 含义 |
 |---|---|---|---|
@@ -564,4 +662,14 @@
 | BILL_PAYMENT_CARD_NOT_FOUND | 409 | transaction | 账户下无卡，无法账单支付 |
 | AUTHORIZATION_NOT_FOUND | 404 | authorization | 授权记录不存在 |
 | AUTHORIZATION_SUMMARY_NOT_FOUND | 404 | authorization | 该账户无待授权汇总 |
-| DEPENDENCY_UNAVAILABLE | 503 | transaction/authorization | 下游服务不可用 |
+| CAMPAIGN_NOT_FOUND | 404 | marketing | 活动不存在 |
+| CAMPAIGN_NOT_EDITABLE | 409 | marketing | 非草稿活动不可编辑 |
+| INVALID_CAMPAIGN_RULE | 409 | marketing | 活动类型与计价字段不匹配 |
+| INVALID_CAMPAIGN_STATE | 409 | marketing | 非法状态迁移 |
+| CAMPAIGN_EXPIRED | 409 | marketing | 活动已过期，无法发布 |
+| BUDGET_REQUIRED | 409 | marketing | 返现活动必须有正预算 |
+| BUDGET_EXHAUSTED | 409 | marketing | 活动预算已用完 |
+| CAMPAIGN_NOT_ACTIVE | 409 | marketing | 非进行中活动不能报名 |
+| REWARD_NOT_FOUND | 404 | marketing | 奖励记录不存在 |
+| INVALID_CASHBACK_AMOUNT | 409 | account | 返现金额必须大于 0 |
+| DEPENDENCY_UNAVAILABLE | 503 | transaction/authorization/marketing | 下游服务不可用 |

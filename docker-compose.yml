@@ -102,6 +102,7 @@ services:
       DB_PASSWORD: carddemo
       CARD_SERVICE_URL: http://card-service:8083
       ACCOUNT_SERVICE_URL: http://account-service:8084
+      MARKETING_SERVICE_URL: http://marketing-service:8087
     ports:
       - "8085:8085"
     depends_on:
@@ -110,6 +111,8 @@ services:
       card-service:
         condition: service_started
       account-service:
+        condition: service_started
+      marketing-service:
         condition: service_started
 
   authorization-service:
@@ -150,6 +153,7 @@ services:
       ACCOUNT_SERVICE_URL: http://account-service:8084
       TRANSACTION_SERVICE_URL: http://transaction-service:8085
       AUTHORIZATION_SERVICE_URL: http://authorization-service:8086
+      MARKETING_SERVICE_URL: http://marketing-service:8087
     ports:
       - "8090:8080"
     depends_on:
@@ -164,6 +168,28 @@ services:
       transaction-service:
         condition: service_started
       authorization-service:
+        condition: service_started
+      marketing-service:
+        condition: service_started
+
+  marketing-service:
+    build:
+      context: ./services/marketing-service
+    container_name: carddemo-marketing
+    environment:
+      SERVER_PORT: 8087
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: carddemo_marketing
+      DB_USER: carddemo
+      DB_PASSWORD: carddemo
+      ACCOUNT_SERVICE_URL: http://account-service:8084
+    ports:
+      - "8087:8087"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      account-service:
         condition: service_started
 
 volumes:

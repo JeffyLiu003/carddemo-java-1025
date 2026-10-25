@@ -25,6 +25,7 @@
         <module>services/account-service</module>
         <module>services/transaction-service</module>
         <module>services/authorization-service</module>
+        <module>services/marketing-service</module>
         <module>services/web-ui</module>
     </modules>
 

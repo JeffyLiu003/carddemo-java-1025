@@ -17,6 +17,7 @@ proxy:
   account-service-url: ${ACCOUNT_SERVICE_URL:http://localhost:8084}
   transaction-service-url: ${TRANSACTION_SERVICE_URL:http://localhost:8085}
   authorization-service-url: ${AUTHORIZATION_SERVICE_URL:http://localhost:8086}
+  marketing-service-url: ${MARKETING_SERVICE_URL:http://localhost:8087}
 
 management:
   endpoints:

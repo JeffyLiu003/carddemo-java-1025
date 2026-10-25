@@ -7,6 +7,8 @@ import com.carddemo.transaction.domain.repository.TranCategoryBalanceRepository;
 import com.carddemo.transaction.domain.repository.TransactionRepository;
 import com.carddemo.transaction.infrastructure.client.AccountClient;
 import com.carddemo.transaction.infrastructure.client.CardClient;
+import com.carddemo.transaction.infrastructure.client.MarketingClient;
+import com.carddemo.transaction.domain.exception.RemoteServiceException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -24,6 +26,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -57,6 +60,9 @@ class PostingServiceTest {
     @MockBean
     private AccountClient accountClient;
 
+    @MockBean
+    private MarketingClient marketingClient;
+
     private final CardSnapshot card = new CardSnapshot(CARD_NUMBER, ACCOUNT_ID, "000000001",
             "IMMANUEL KESSLER", LocalDate.of(2028, 5, 20), "Y");
 
@@ -87,12 +93,28 @@ class PostingServiceTest {
         assertThat(result.rejections()).isEmpty();
 
         verify(accountClient).applyPosting(ACCOUNT_ID, new BigDecimal("75.00"));
+        verify(marketingClient).evaluateRewards(any());
         assertThat(transactions.findByTransactionId("0000000000000100")).isPresent();
         assertThat(balances.find(ACCOUNT_ID, "01", "0001")).get()
                 .extracting(TranCategoryBalance::getBalance)
                 .isEqualTo(new BigDecimal("1275.00"));
         assertThat(dailyStatus("0000000000000100")).isEqualTo("POSTED");
         assertThat(rejectReasonCode("0000000000000100")).isNull();
+    }
+
+    @Test
+    void marketingFailureDoesNotFailPosting() {
+        when(cardClient.findCard(CARD_NUMBER)).thenReturn(Optional.of(card));
+        when(accountClient.findAccount(ACCOUNT_ID)).thenReturn(Optional.of(account("5000.00")));
+        when(accountClient.applyPosting(eq(ACCOUNT_ID), any())).thenReturn(account("5000.00"));
+        doThrow(new RemoteServiceException("marketing down"))
+                .when(marketingClient).evaluateRewards(any());
+
+        PostingResult result = postingService.post(List.of(command("0000000000000103", "30.00")));
+
+        assertThat(result.status()).isEqualTo("COMPLETED");
+        assertThat(result.posted()).isEqualTo(1);
+        assertThat(transactions.findByTransactionId("0000000000000103")).isPresent();
     }
 
     @Test

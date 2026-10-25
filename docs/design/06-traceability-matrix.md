@@ -75,12 +75,31 @@
 | BR-RPT-01..04 | `TransactionReportService` | `TransactionReportServiceTest` |
 | BR-AUTH-01..13、NR-AUTH-01/02/03 | `AuthorizationService`、`AuthorizationPolicy`、`AuthorizationPurgeService` | `AuthorizationPolicyTest`、`AuthorizationControllerTest` |
 
-## 4. 覆盖度自检
+## 5. 新增能力：信用卡营销（营销上下文）
+
+> 存量 CardDemo 无营销能力，本次为新增能力，不涉及遗留程序迁移。设计与规则见
+> `docs/design/08-marketing-capability.md`；集成决策见 ADR-009。
+
+| 能力 | 目标服务 / 接口 | 规则 | 测试 |
+|---|---|---|---|
+| 活动创建与生命周期 | marketing `POST/PUT /campaigns`、`/{id}/activate|pause|end` | MK-CAM-01..06 | `CampaignTest` |
+| 资格判定 | marketing `GET /eligibilities`、`EligibilityPolicy` | MK-ELI-01..09 | `EligibilityPolicyTest` |
+| 报名 | marketing `POST /campaigns/{id}/enrollments` | MK-ENR-01..03 | `MarketingApiTest` |
+| 奖励计价 | `RewardCalculator`（固定/比例封顶/积分倍数） | MK-REW-02 | `RewardCalculatorTest` |
+| 奖励评估与幂等 | marketing `POST /reward-evaluations` | MK-REW-01/03..08 | `RewardEvaluationServiceTest`、`MarketingApiTest` |
+| 返现入账与幂等 | account `POST /accounts/{id}/cashback-credits` | NR-REWARD-01 | `AccountTest`、`AccountControllerTest` |
+| 失败重试 | marketing `POST /rewards/{id}/fulfill` | MK-REW-07 | `RewardEvaluationServiceTest` |
+| 入账触发营销 | transaction `PostingService` → `MarketingClient` | ADR-009（失败不回滚） | `PostingServiceTest` |
+| 活动效果 | marketing `GET /campaigns/{id}/performance`、`/marketing/summary` | MK-QRY-01..03 | `MarketingApiTest` |
+| 前台活动中心/奖励/活动管理 | web-ui `#/offers`、`#/rewards`、`#/campaigns` | — | jsdom 界面端到端（9/9） |
+
+## 6. 覆盖度自检
 
 | 检查项 | 结果 |
 |---|---|
 | 44 个遗留程序是否都有去向 | 44/44（24 在线 + 20 批处理/工具，见 §1/§2） |
 | 核心域程序（授权/入账/利息/账单支付/账户维护）是否等价实现 | 5/5 |
+| 新增营销能力的场景/规则/接口/测试是否闭环 | 10 项能力全部有实现与测试（见 §5） |
 | 每条已声明的业务规则是否有实现或明确延后理由 | 100% |
 | 每项延后是否需要业务确认 | 是（U4 商户欺诈、U5 报表排版、BR-MIG、BR-MQ、BR-INT-05 费用） |
 | 是否存在未追踪的遗留数据字段 | 否（见 `docs/legacy/04-data-dictionary.md`，卡片 CVV 仅存储不暴露） |

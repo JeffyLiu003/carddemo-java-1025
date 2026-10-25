@@ -4,8 +4,10 @@ import com.carddemo.account.application.AccountApplicationService;
 import com.carddemo.account.domain.model.Account;
 import com.carddemo.account.interfaces.rest.dto.AccountResponse;
 import com.carddemo.account.interfaces.rest.dto.AmountRequest;
+import com.carddemo.account.interfaces.rest.dto.CashbackCreditRequest;
 import com.carddemo.account.interfaces.rest.dto.PostingRequest;
 import com.carddemo.account.interfaces.rest.dto.UpdateAccountRequest;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -66,5 +68,13 @@ public class AccountController {
                                                           @Valid @RequestBody AmountRequest request) {
         return ResponseEntity.ok(AccountResponse.from(
                 accountService.accrueInterest(accountId, request.amount())));
+    }
+
+    @Operation(summary = "营销返现入账", description = "按 rewardId 幂等冲减欠款；余额可为负表示溢缴")
+    @PostMapping("/{accountId}/cashback-credits")
+    public ResponseEntity<AccountResponse> creditCashback(@PathVariable String accountId,
+                                                          @Valid @RequestBody CashbackCreditRequest request) {
+        return ResponseEntity.ok(AccountResponse.from(accountService.creditCashback(accountId,
+                request.rewardId(), request.campaignId(), request.amount())));
     }
 }

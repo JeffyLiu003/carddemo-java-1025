@@ -12,6 +12,7 @@
 | 账户（Account） | 核心域 | account-service :8084 | `carddemo_account` | Account |
 | 交易与账务（Transaction） | 核心域 | transaction-service :8085 | `carddemo_transaction` | TransactionRecord、TranCategoryBalance、TranType、TranCategory、DisclosureGroup |
 | 授权（Authorization） | 核心域 | authorization-service :8086 | `carddemo_authorization` | AuthorizationCase、PendingAuthorizationSummary、CardFraudFlag |
+| 营销（Marketing） | 支撑域（新增） | marketing-service :8087 | `carddemo_marketing` | Campaign、Enrollment、RewardGrant |
 
 ## 2. 各上下文职责与边界
 
@@ -68,6 +69,18 @@
 - **不属于**：账户余额与额度（只读取快照）、交易入账（授权批准不等于入账）、客户资料。
 - **遗留映射**：COPAUA0C、COPAUS0C/1C/2C、CBPAUP0C、IMS PAUTSUM0/PAUTDTL1、DB2 AUTHFRDS。
 
+### 2.7 Marketing（marketing-service，新增）
+
+- **职责**：活动配置与生命周期、报名、消费奖励评估（返现/积分）、奖励发放与重试、活动效果统计。
+- **聚合**：`Campaign`（活动，状态机 DRAFT→ACTIVE⇄PAUSED→ENDED）、`Enrollment`（报名）、
+  `RewardGrant`（奖励发放，幂等键 campaignId+transactionId）。
+- **不变量**：见 `08-marketing-capability.md` §2 与 MK-* 规则；预算不可超发；同一交易同一活动只发一次。
+- **对外契约**：`/api/v1/campaigns`、`/api/v1/eligibilities`、`/api/v1/reward-evaluations`、
+  `/api/v1/rewards`、`/api/v1/marketing/summary`。
+- **不属于**：账户余额（只读快照，返现由 Account 执行）、交易账本、卡片状态、客户资料。
+- **集成**：Transaction 入账成功后同步调用评估（失败只告警）；返现调 Account 幂等入账。见 ADR-009。
+- **遗留映射**：无（存量系统不具备营销能力）。
+
 ## 3. 跨上下文协作（谁问谁答）
 
 | 场景 | 发起方 | 依赖 | 数据流向 |
@@ -77,6 +90,8 @@
 | 账单支付 | Transaction | Account、Card | 读余额；写交易；扣款 |
 | 利息 | Transaction | Account | 写利息交易；余额与账期结算 |
 | 授权决策 | Authorization | Card、Account、Customer | 读卡/账户/客户快照；写本地授权汇总 |
+| 奖励评估 | Transaction → Marketing | Account | 入账后传交易快照；Marketing 读账户组并把返现写回 Account |
+| 活动中心/奖励 | Web UI → Marketing | Account | 读账户快照判断资格；读本地报名与奖励 |
 | 交易报表 | Transaction | — | 只读本地交易与参照数据 |
 | 账户视图 | 调用方（UI/BFF） | Account、Customer、Card | 三次查询组合 |
 

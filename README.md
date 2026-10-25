@@ -2,7 +2,7 @@
 
 把 AWS CardDemo（CICS/COBOL 信用卡核心演示系统）迁移为基于 **DDD 限界上下文**的 Java 微服务工程。
 本项目不是逐行翻译 COBOL，而是：先提取存量业务知识（L1–L5 五层模型 + 业务规则目录），
-再按领域边界划分 6 个微服务，最后用 Spring Boot 3 落地，并提供面向业务人员的 Web 界面与
+再按领域边界划分 7 个微服务（6 个既有业务域 + 1 个新增营销支撑域），最后用 Spring Boot 3 落地，并提供面向业务人员的 Web 界面与
 Docker Compose 调试运行能力。
 
 ## 1. 架构总览
@@ -19,8 +19,9 @@ graph LR
     subgraph 支撑/通用域
       CUST[customer-service :8082<br/>客户主数据]
       IAM[iam-service :8081<br/>登录/用户]
+      MKT[marketing-service :8087<br/>活动/报名/返现/积分]
     end
-    DB[(PostgreSQL 16<br/>6 个独立 database)]
+    DB[(PostgreSQL 16<br/>7 个独立 database)]
 
     WEB -. /api/** 代理 .-> IAM
     WEB -.-> CUST
@@ -28,18 +29,22 @@ graph LR
     WEB -.-> ACCT
     WEB -.-> TXN
     WEB -.-> AUTH
+    WEB -.-> MKT
     CARD --> TXN
     ACCT --> TXN
     CARD --> AUTH
     ACCT --> AUTH
     CUST -.-> AUTH
     IAM -. token 契约（POC 未强制） .-> TXN
+    TXN -. 入账后奖励评估 .-> MKT
+    MKT --> ACCT
     TXN --> DB
     AUTH --> DB
     ACCT --> DB
     CARD --> DB
     CUST --> DB
     IAM --> DB
+    MKT --> DB
 ```
 
 | 服务 | 端口 | 数据库 | 对应遗留程序 |
@@ -51,14 +56,15 @@ graph LR
 | account-service | 8084 | `carddemo_account` | ACCTDAT、COACTVWC、COACTUPC（账户部分）、CBTRN02C 账户段、CBACT04C 结算、COBIL00C 扣款 |
 | transaction-service | 8085 | `carddemo_transaction` | TRANSACT、DALYTRAN、TCATBALF、CBTRN01C/02C/03C、CBACT04C、COBIL00C、COTRN00C/01C/02C、CORPT00C、COTRTLIC |
 | authorization-service | 8086 | `carddemo_authorization` | COPAUA0C、COPAUS0C/1C/2C、CBPAUP0C、IMS PAUTSUM0/PAUTDTL1、DB2 AUTHFRDS |
+| marketing-service | 8087 | `carddemo_marketing` | **新增能力**（存量无营销）：活动、报名、返现/积分、活动效果 |
 
 ## 2. 目录结构
 
 ```
 carddemo-java-1025/
 ├── pom.xml                      # Maven 聚合父 POM（Spring Boot 3.3.6 / Java 21）
-├── docker-compose.yml           # PostgreSQL + 6 个微服务 + Web 界面
-├── docker/postgres/init/        # 6 个 database 初始化
+├── docker-compose.yml           # PostgreSQL + 7 个微服务 + Web 界面
+├── docker/postgres/init/        # 7 个 database 初始化
 ├── scripts/build-and-up.sh      # 打包 + 构建镜像 + 启动
 ├── scripts/smoke-test.sh        # 端到端冒烟测试
 ├── docs/
@@ -66,18 +72,24 @@ carddemo-java-1025/
 │   ├── design/                  # DDD 设计：子域/上下文/拆分/API/追踪矩阵/ADR
 │   └── ops/                     # Docker 运行与调试手册
 └── services/
-    ├── web-ui/                  # 业务界面（静态 SPA）+ 同源 API 代理
     ├── iam-service/
     ├── customer-service/
     ├── card-service/
     ├── account-service/
     ├── transaction-service/
-    └── authorization-service/
-        └── src/main/java/com/carddemo/<context>/
-            ├── interfaces/rest   # Controller + DTO
-            ├── application       # 用例编排、事务边界
-            ├── domain            # 聚合根、领域服务、仓储端口、异常
-            └── infrastructure    # JPA 适配器、下游 REST 客户端、配置
+    ├── authorization-service/
+    ├── marketing-service/       # 营销：活动/报名/奖励/效果（新增）
+    └── web-ui/                  # 业务界面（静态 SPA）+ 同源 API 代理
+```
+
+除 `web-ui` 外，每个 Java 微服务采用同一分层：
+
+```
+src/main/java/com/carddemo/<context>/
+├── interfaces/rest   # Controller + DTO
+├── application       # 用例编排、事务边界
+├── domain            # 聚合根、领域服务、仓储端口、异常
+└── infrastructure    # JPA 适配器、下游 REST 客户端、配置
 ```
 
 ## 3. 快速开始
@@ -101,7 +113,7 @@ docker compose ps
 全部单元/集成测试：
 
 ```bash
-mvn test        # 164 个用例，H2 + Flyway，多模块并行
+mvn test        # 197 个用例，H2 + Flyway，多模块并行
 ```
 
 ## 3.1 Web 界面（推荐）
@@ -119,6 +131,9 @@ mvn test        # 164 个用例，H2 + Flyway，多模块并行
 | 账单支付 | 查询欠款 → 确认 → 全额还款并回显新余额 | COBIL00C |
 | 交易报表 | 日期区间统计、区间合计、按卡合计 | CORPT00C / CBTRN03C |
 | 授权管理 | 待授权汇总、明细、标记欺诈、过期清理 | COPAUS0C/1C/2C、CBPAUP0C |
+| 活动中心 | 查看可参与活动、资格原因、报名（营销新增） | 新增能力 |
+| 我的奖励 | 返现/积分记录、状态、待入账重试（营销新增） | 新增能力 |
+| 活动管理 | 新建、编辑草稿、发布/暂停/结束、效果指标（管理员） | 新增能力 |
 | 用户管理 | 列表、新增、编辑、删除（仅管理员） | COUSR00C–03C |
 
 | 演示账号 | 密码 | 类型 |
@@ -192,6 +207,8 @@ curl -s "localhost:8085/api/v1/reports/transactions?startDate=2026-09-01&endDate
 - **乐观锁替代记录锁**：`@Version` 替代 `READ UPDATE` + 快照比对，冲突返回 409。见 ADR-006。
 - **缺陷修复**（均有记录与测试）：CVV 不被卡维护覆盖、过期授权清理回退信用余额、
   可用额度同时扣减账户欠款与授权占用、密码 PBKDF2 存储。见规则目录中的 `NR-*`。
+- **营销能力（新增）**：活动/报名/奖励独立成上下文；入账成功后同步评估奖励，失败只告警不回滚账务；
+  返现由 account-service 以 `rewardId` 幂等入账，待入账可重试。见 `docs/design/08-marketing-capability.md` 与 ADR-009。
 
 ## 6. 文档
 
@@ -202,8 +219,9 @@ curl -s "localhost:8085/api/v1/reports/transactions?startDate=2026-09-01&endDate
 | [docs/legacy/03-business-rule-catalog.md](docs/legacy/03-business-rule-catalog.md) | 业务规则 → 实现落点 → 状态 |
 | [docs/design/02-bounded-contexts.md](docs/design/02-bounded-contexts.md) | 6 个限界上下文 |
 | [docs/design/05-api-catalog.md](docs/design/05-api-catalog.md) | 全部 API 契约与种子数据 |
-| [docs/design/06-traceability-matrix.md](docs/design/06-traceability-matrix.md) | 44 个遗留程序的去向 |
-| [docs/design/adr/README.md](docs/design/adr/README.md) | 8 个架构决策 |
+| [docs/design/06-traceability-matrix.md](docs/design/06-traceability-matrix.md) | 44 个遗留程序的去向（营销为新增能力） |
+| [docs/design/08-marketing-capability.md](docs/design/08-marketing-capability.md) | 营销场景、领域模型、积分/返现规则与前后台改造 |
+| [docs/design/adr/README.md](docs/design/adr/README.md) | 9 个架构决策 |
 | [docs/ops/01-docker-runbook.md](docs/ops/01-docker-runbook.md) | Docker 调试运行手册 |
 
 ## 7. 已知限制（POC 范围）
@@ -214,3 +232,5 @@ curl -s "localhost:8085/api/v1/reports/transactions?startDate=2026-09-01&endDate
 3. **报表只迁移数据口径**，不迁移 133 字节打印排版；对账单/分行迁移/MQ 适配器为延后项。
 4. **种子数据为归一化样例**：遗留 ASCII 数据存在 EBCDIC 过穿孔字符，真实迁移须按数据字典解码。
 5. 单账户并发授权使用乐观锁，热点账户需重试；压测与分区方案待补（未解决项 U1）。
+6. **营销为新增能力**：入账后同步评估（最坏 +2s，营销不可用不影响入账）；预算并发极端情况下可能超发 1 笔；
+   积分仅记录、暂不支持兑换；活动叠加策略需业务确认（`08-marketing-capability.md` §8）。

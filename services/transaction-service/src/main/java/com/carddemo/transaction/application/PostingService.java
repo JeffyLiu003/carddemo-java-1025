@@ -13,6 +13,10 @@ import com.carddemo.transaction.domain.repository.TransactionRepository;
 import com.carddemo.transaction.domain.service.PostingPolicy;
 import com.carddemo.transaction.infrastructure.client.AccountClient;
 import com.carddemo.transaction.infrastructure.client.CardClient;
+import com.carddemo.transaction.infrastructure.client.MarketingClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +33,7 @@ import java.util.Optional;
 @Transactional
 public class PostingService {
 
+    private static final Logger log = LoggerFactory.getLogger(PostingService.class);
     private static final BigDecimal ZERO = new BigDecimal("0.00");
 
     private final TransactionRepository transactions;
@@ -38,6 +43,8 @@ public class PostingService {
     private final CardClient cardClient;
     private final AccountClient accountClient;
     private final PostingPolicy postingPolicy;
+    private final MarketingClient marketingClient;
+    private final boolean marketingEnabled;
 
     public PostingService(TransactionRepository transactions,
                           DailyTransactionRepository dailyTransactions,
@@ -45,7 +52,9 @@ public class PostingService {
                           TransactionIdGenerator idGenerator,
                           CardClient cardClient,
                           AccountClient accountClient,
-                          PostingPolicy postingPolicy) {
+                          PostingPolicy postingPolicy,
+                          MarketingClient marketingClient,
+                          @Value("${marketing.enabled:true}") boolean marketingEnabled) {
         this.transactions = transactions;
         this.dailyTransactions = dailyTransactions;
         this.balances = balances;
@@ -53,6 +62,8 @@ public class PostingService {
         this.cardClient = cardClient;
         this.accountClient = accountClient;
         this.postingPolicy = postingPolicy;
+        this.marketingClient = marketingClient;
+        this.marketingEnabled = marketingEnabled;
     }
 
     public PostingResult post(List<PostingCommand> commands) {
@@ -112,10 +123,29 @@ public class PostingService {
                     TransactionStatus.POSTED);
             transactions.saveTransaction(record);
             dailyTransactions.saveDailyTransaction(DailyTransaction.posted(record));
+            evaluateRewards(record, card, command);
             posted++;
         }
 
         String status = rejected > 0 ? "COMPLETED_WITH_REJECTS" : "COMPLETED";
         return new PostingResult(status, commands.size(), posted, rejected, rejections, duplicates);
+    }
+
+    /**
+     * ADR-009：入账是资金事实，营销是附加权益。评估失败只告警，不影响入账结果。
+     */
+    private void evaluateRewards(TransactionRecord record, CardSnapshot card, PostingCommand command) {
+        if (!marketingEnabled) {
+            return;
+        }
+        try {
+            marketingClient.evaluateRewards(new MarketingClient.RewardEvaluationCommand(
+                    record.getTransactionId(), command.cardNumber(), record.getAccountId(),
+                    card.customerId(), record.getAmount(), command.categoryCode(),
+                    command.typeCode(), command.description(), record.getProcessedTimestamp()));
+        } catch (RuntimeException ex) {
+            log.warn("Reward evaluation failed for transaction {}: {}",
+                    record.getTransactionId(), ex.getMessage());
+        }
     }
 }

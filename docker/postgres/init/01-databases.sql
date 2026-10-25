@@ -5,3 +5,4 @@ CREATE DATABASE carddemo_card;
 CREATE DATABASE carddemo_account;
 CREATE DATABASE carddemo_transaction;
 CREATE DATABASE carddemo_authorization;
+CREATE DATABASE carddemo_marketing;

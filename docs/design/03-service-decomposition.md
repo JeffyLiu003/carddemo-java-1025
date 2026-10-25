@@ -11,6 +11,7 @@
 | account-service | 8084 | `carddemo_account` | 账户查询/维护、记账、还款、利息入账 | 无 |
 | transaction-service | 8085 | `carddemo_transaction` | 交易录入/查询、入账、利息、账单支付、报表、交易类型 | card、account |
 | authorization-service | 8086 | `carddemo_authorization` | 授权决策、待授权汇总、欺诈标记、过期清理 | card、account、customer |
+| marketing-service | 8087 | `carddemo_marketing` | 活动/报名/奖励评估/效果统计 | account |
 
 ## 2. 数据所有权
 
@@ -22,17 +23,20 @@
 | `account` | account | 余额与额度唯一权威 |
 | `transaction`、`daily_transaction`、`tran_category_balance`、`tran_type`、`tran_category`、`disclosure_group` | transaction | 交易账本与参照数据 |
 | `auth_summary`、`auth_detail` | authorization | 待授权汇总与明细 |
+| `campaign`、`enrollment`、`reward_grant` | marketing | 活动、报名与奖励（奖励评估与幂等） |
+| `reward_credit` | account | 返现入账幂等记录（rewardId 唯一） |
 
 ## 3. 服务间调用矩阵
 
-| 调用方 → 被调方 | Card | Account | Customer | Transaction |
-|---|---|---|---|---|
-| transaction-service | GET 卡快照 | GET 快照 / POST 记账 / POST 还款 / POST 利息 | — | — |
-| authorization-service | GET 卡快照 | GET 快照 | GET 客户存在性 | — |
-| account-service | — | — | — | — |
-| card-service | — | — | — | — |
-| customer-service | — | — | — | — |
-| iam-service | — | — | — | — |
+| 调用方 → 被调方 | Card | Account | Customer | Transaction | Marketing |
+|---|---|---|---|---|---|
+| transaction-service | GET 卡快照 | GET 快照 / POST 记账 / POST 还款 / POST 利息 | — | — | POST 奖励评估 |
+| authorization-service | GET 卡快照 | GET 快照 | GET 客户存在性 | — | — |
+| marketing-service | — | GET 快照 / POST 返现入账 | — | — | — |
+| account-service | — | — | — | — | — |
+| card-service | — | — | — | — | — |
+| customer-service | — | — | — | — | — |
+| iam-service | — | — | — | — | — |
 
 调用次数（单次业务操作）：
 
@@ -43,6 +47,8 @@
 | 账单支付 | transaction → account GET(1) + account POST(1) + card(1) | +30ms |
 | 利息运行 | transaction → account POST(每账户 1 次) | 账户数 × 10ms |
 | 授权决策 | authorization → card(1) + account(1) + customer(1) | +30ms |
+| 消费入账后奖励评估 | transaction → marketing(1)；marketing → account GET(1) + cashback POST(1) | +40ms（失败仅告警） |
+| 活动中心 | marketing → account GET(1) | +10ms |
 
 ## 4. 调用与失败语义
 
@@ -73,6 +79,7 @@ docker compose
 ├── account-service    :8084
 ├── transaction-service:8085  → 依赖 card/account healthy
 ├── authorization-service:8086 → 依赖 card/account/customer healthy
+├── marketing-service  :8087 → 依赖 postgres healthy、account started
 └── web-ui             :8090 → 宿主机 8090 映射容器 8080（宿主 8080 被占用）
 ```
 
@@ -103,5 +110,7 @@ docker compose
 | `CARD_SERVICE_URL` | transaction、authorization | `http://localhost:8083`（Compose 内 `http://card-service:8083`） |
 | `ACCOUNT_SERVICE_URL` | transaction、authorization | `http://localhost:8084` |
 | `CUSTOMER_SERVICE_URL` | authorization | `http://localhost:8082` |
+| `MARKETING_SERVICE_URL` | transaction、web-ui | `http://localhost:8087` |
+| `MARKETING_ENABLED` | transaction | `true`（关闭后不再触发奖励评估） |
 | `IAM_TOKEN_SECRET` | iam | 演示密钥（生产必须从密钥管理注入） |
 | `IAM_TOKEN_TTL_SECONDS` | iam | `3600` |

@@ -10,3 +10,4 @@
 | ADR-006 | 并发控制改为乐观锁 | 已接受 | `07-java-conventions.md` §6 |
 | ADR-007 | 鉴权强制校验的范围（POC） | 已接受（有风险） | `docs/ops/01-docker-runbook.md` §7 |
 | ADR-008 | 密码存储与登录错误语义 | 已接受 | `02-bounded-contexts.md` §IAM |
+| ADR-009 | 营销奖励的评估与入账集成方式 | 已接受 | `08-marketing-capability.md` §3 |
