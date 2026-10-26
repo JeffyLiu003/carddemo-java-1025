@@ -10,6 +10,18 @@ LEDGER_URL=${LEDGER_URL:-http://localhost:8088}
 KEY="chaos-$(date +%s)"
 BATCH=""
 
+sync_batch() {
+  local batch_id=$1
+  local synced="False"
+  for _ in 1 2 3 4 5; do
+    synced=$(curl -s -X POST "$TXN/api/v1/posting-batches/$batch_id/ledger-sync" \
+      | python3 -c "import json,sys; print(json.load(sys.stdin).get('ledgerEntryId') is not None)" 2>/dev/null || true)
+    [ "$synced" = "True" ] && break
+    sleep 2
+  done
+  echo "  ledger-sync $batch_id: $synced"
+}
+
 restore() {
   echo "==> 恢复 ledger-service"
   docker compose start ledger-service >/dev/null
@@ -19,9 +31,12 @@ restore() {
   done
   curl -s "$LEDGER_URL/actuator/health" | python3 -c "import json,sys; print('ledger:', json.load(sys.stdin)['status'])" || true
   if [ -n "$BATCH" ]; then
-    echo "==> 冲正测试批次 $BATCH"
-    curl -s -X POST "$TXN/api/v1/posting-batches/$BATCH/reversal" \
-      | python3 -c "import json,sys; d=json.load(sys.stdin); print('reversal:', d['status'])" || true
+    echo "==> 补同步总账并冲正测试批次 $BATCH"
+    sync_batch "$BATCH"
+    REV_BATCH=$(curl -s -X POST "$TXN/api/v1/posting-batches/$BATCH/reversal" \
+      | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['batchId'])" 2>/dev/null || true)
+    echo "  reversal: $REV_BATCH"
+    [ -n "$REV_BATCH" ] && sync_batch "$REV_BATCH"
   fi
 }
 trap restore EXIT

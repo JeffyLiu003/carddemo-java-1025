@@ -110,6 +110,22 @@ public class Account {
     }
 
     /**
+     * 贷记账户（如营销返现）：金额恒为正，减少欠款；允许余额为负（溢缴）。
+     * 与还款不同，贷记不改本期贷/借累计。幂等由调用方按 creditId 保证。
+     */
+    public void applyCredit(BigDecimal amount) {
+        if (amount == null || amount.signum() <= 0) {
+            throw new BusinessRuleException("INVALID_CREDIT_AMOUNT",
+                    "Credit amount must be greater than zero.");
+        }
+        if (amount.scale() > 2) {
+            throw new BusinessRuleException("INVALID_CREDIT_AMOUNT",
+                    "Credit amount must have at most 2 decimal places.");
+        }
+        currentBalance = currentBalance.subtract(amount);
+    }
+
+    /**
      * BR-INT-001：月度利息入账，并清零本期贷/借累计（CBACT04C 1050-UPDATE-ACCOUNT）。
      */
     public void accrueInterest(BigDecimal interest) {

@@ -39,6 +39,14 @@ public class RestClientConfig {
         return build(builder, baseUrl, connectTimeout, readTimeout);
     }
 
+    @Bean
+    public RestClient marketingRestClient(RestClient.Builder builder,
+                                          @Value("${client.marketing-service.base-url:http://localhost:8087}") String baseUrl,
+                                          @Value("${client.connect-timeout:3s}") Duration connectTimeout,
+                                          @Value("${client.read-timeout:3s}") Duration readTimeout) {
+        return build(builder, baseUrl, connectTimeout, readTimeout);
+    }
+
     private static RestClient build(RestClient.Builder builder, String baseUrl,
                                     Duration connectTimeout, Duration readTimeout) {
         ClientHttpRequestFactorySettings settings = ClientHttpRequestFactorySettings.DEFAULTS

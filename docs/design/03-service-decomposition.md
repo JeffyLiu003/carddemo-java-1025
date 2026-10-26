@@ -16,6 +16,7 @@
 | billing-service | 8092 | `carddemo_billing` | 账单生成、利息/最低还款、账单支付 | account |
 | limit-service | 8093 | `carddemo_limit` | 限额定义、占用/释放、可用性检查 | 无 |
 | fx-service | 8094 | `carddemo_fx` | 汇率、报价、换汇 | 无 |
+| marketing-service | 8087 | `carddemo_marketing` | 高端卡分期返现、报名、返现评估、效果 | account |
 | loan-service | 8095 | `carddemo_loan` | 贷款申请/审批/放款/还款计划 | 无 |
 | fraud-service | 8096 | `carddemo_fraud` | 欺诈评分/警报 | 无 |
 | aml-service | 8097 | `carddemo_aml` | 名单筛查/AML 警报 | 无 |
@@ -48,6 +49,8 @@
 | `statement` | billing | 账单（账户+期间唯一） |
 | `limit_definition` | limit | 限额与用量 |
 | `fx_rate`、`fx_quote`、`fx_conversion` | fx | 汇率、报价与换汇记录 |
+| `campaign`、`enrollment`、`reward_grant` | marketing | 高端卡活动、报名与返现记录 |
+| `account_credit` | account | 通用贷记流水（返现/权益入账，creditId 幂等） |
 | `loan_application`、`loan`、`repayment_schedule` | loan | 贷款申请、贷款与还款计划 |
 | `fraud_rule`、`fraud_evaluation`、`fraud_alert` | fraud | 规则、评分与警报 |
 | `sanctions_entry`、`screening_result`、`aml_alert` | aml | 名单、筛查与警报 |
@@ -124,7 +127,7 @@
 
 ```
 docker compose
-├── postgres (16)                # 单实例，24 个 database（init 脚本创建，max_connections=300）
+├── postgres (16)                # 单实例，25 个 database（init 脚本创建，max_connections=300）
 ├── iam-service        :8081
 ├── customer-service   :8082
 ├── card-service       :8083
@@ -136,6 +139,7 @@ docker compose
 ├── billing-service    :8092  → 依赖 postgres/account started
 ├── limit-service      :8093  → 依赖 postgres healthy
 ├── fx-service         :8094  → 依赖 postgres healthy
+├── marketing-service  :8087  → 依赖 postgres healthy、account started
 ├── bff-service        :8107  → 依赖 account/card/customer/transaction
 ├── search-service     :8108  → 依赖 customer/transaction
 ├── authorization-service:8086 → 依赖 card/account/customer healthy
@@ -157,7 +161,7 @@ docker compose
 ```
 
 > `web-ui` 是**表现层**，不是限界上下文：它只托管静态 SPA，并把 `/api/**` 按路径前缀同源代理到
-> 26 个微服务，不拥有任何业务数据、不实现业务规则。浏览器因此只需访问一个源，无需 CORS。
+> 27 个微服务，不拥有任何业务数据、不实现业务规则。浏览器因此只需访问一个源，无需 CORS。
 
 启动顺序：`postgres`（healthcheck: `pg_isready`）→ 无依赖服务 → `ledger` → `transaction` →
 `reconciliation` / `authorization` / `web-ui`。
@@ -182,7 +186,9 @@ docker compose
 |---|---|---|
 | `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER`/`DB_PASSWORD` | 全部 | `localhost`/`5432`/`carddemo_*`/`carddemo`/`carddemo` |
 | `CARD_SERVICE_URL` | transaction、authorization | `http://localhost:8083`（Compose 内 `http://card-service:8083`） |
-| `ACCOUNT_SERVICE_URL` | transaction、authorization | `http://localhost:8084` |
+| `ACCOUNT_SERVICE_URL` | transaction、authorization、marketing | `http://localhost:8084` |
 | `CUSTOMER_SERVICE_URL` | authorization | `http://localhost:8082` |
+| `MARKETING_SERVICE_URL` | transaction、web-ui | `http://localhost:8087` |
+| `MARKETING_ENABLED` | transaction | `true`（关闭后不再触发返现评估） |
 | `IAM_TOKEN_SECRET` | iam | 演示密钥（生产必须从密钥管理注入） |
 | `IAM_TOKEN_TTL_SECONDS` | iam | `3600` |

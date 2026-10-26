@@ -100,6 +100,100 @@ class AccountControllerTest {
     }
 
     @Test
+    void creditReducesBalanceAndIsIdempotentPerCreditId() throws Exception {
+        String creditId = UUID.randomUUID().toString();
+        BigDecimal before = balanceOf("00000000002");
+        String body = """
+                {"creditId":"%s","sourceType":"CASHBACK","amount":30.00,
+                 "description":"PLATINUM_3M cashback"}
+                """.formatted(creditId);
+
+        mockMvc.perform(post("/api/v1/accounts/00000000002/credits")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accountId").value("00000000002"))
+                .andExpect(jsonPath("$.productCode").value("GOLD"));
+
+        assertThat(balanceOf("00000000002"))
+                .isEqualByComparingTo(before.subtract(new BigDecimal("30.00")));
+
+        mockMvc.perform(post("/api/v1/accounts/00000000002/credits")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk());
+
+        assertThat(balanceOf("00000000002"))
+                .isEqualByComparingTo(before.subtract(new BigDecimal("30.00")));
+    }
+
+    @Test
+    void creditAllowsNegativeBalanceForOverpayment() throws Exception {
+        BigDecimal before = balanceOf("00000000004");
+
+        mockMvc.perform(post("/api/v1/accounts/00000000004/credits")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"creditId":"%s","sourceType":"CASHBACK","amount":1000.00}
+                                """.formatted(UUID.randomUUID())))
+                .andExpect(status().isOk());
+
+        assertThat(balanceOf("00000000004"))
+                .isEqualByComparingTo(before.subtract(new BigDecimal("1000.00")))
+                .isNegative();
+    }
+
+    @Test
+    void creditRejectsNonPositiveAmount() throws Exception {
+        mockMvc.perform(post("/api/v1/accounts/00000000004/credits")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"creditId":"%s","sourceType":"CASHBACK","amount":0.00}
+                                """.formatted(UUID.randomUUID())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_CREDIT_AMOUNT"));
+
+        mockMvc.perform(post("/api/v1/accounts/00000000004/credits")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"creditId":"%s","sourceType":"CASHBACK","amount":-5.00}
+                                """.formatted(UUID.randomUUID())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_CREDIT_AMOUNT"));
+    }
+
+    @Test
+    void creditReturns404ForUnknownAccount() throws Exception {
+        mockMvc.perform(post("/api/v1/accounts/99999999999/credits")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"creditId":"%s","sourceType":"CASHBACK","amount":30.00}
+                                """.formatted(UUID.randomUUID())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_NOT_FOUND"));
+    }
+
+    @Test
+    void creditIdCannotBeReusedForAnotherAccount() throws Exception {
+        String creditId = UUID.randomUUID().toString();
+
+        mockMvc.perform(post("/api/v1/accounts/00000000002/credits")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"creditId":"%s","sourceType":"CASHBACK","amount":10.00}
+                                """.formatted(creditId)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/accounts/00000000003/credits")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"creditId":"%s","sourceType":"CASHBACK","amount":10.00}
+                                """.formatted(creditId)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CREDIT_ID_CONFLICT"));
+    }
+
+    @Test
     void updateRejectsInvalidStatus() throws Exception {
         String body = """
                 {

@@ -2,6 +2,7 @@ package com.carddemo.account.interfaces.rest;
 
 import com.carddemo.account.application.AccountApplicationService;
 import com.carddemo.account.domain.model.Account;
+import com.carddemo.account.interfaces.rest.dto.AccountCreditRequest;
 import com.carddemo.account.interfaces.rest.dto.AccountResponse;
 import com.carddemo.account.interfaces.rest.dto.AmountRequest;
 import com.carddemo.account.interfaces.rest.dto.PostingRequest;
@@ -59,6 +60,13 @@ public class AccountController {
     public AccountResponse pay(@PathVariable String accountId,
                                @Valid @RequestBody AmountRequest request) {
         return AccountResponse.from(accountService.applyBillPayment(accountId, request.amount()));
+    }
+
+    @PostMapping("/{accountId}/credits")
+    public AccountResponse credit(@PathVariable String accountId,
+                                  @Valid @RequestBody AccountCreditRequest request) {
+        return AccountResponse.from(accountService.credit(accountId, request.creditId(),
+                request.sourceType(), request.amount(), request.description()));
     }
 
     @PostMapping("/{accountId}/interest-accruals")

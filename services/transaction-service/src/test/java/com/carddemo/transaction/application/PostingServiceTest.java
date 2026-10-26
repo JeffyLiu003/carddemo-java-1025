@@ -5,9 +5,12 @@ import com.carddemo.transaction.domain.model.CardSnapshot;
 import com.carddemo.transaction.domain.model.TranCategoryBalance;
 import com.carddemo.transaction.domain.repository.TranCategoryBalanceRepository;
 import com.carddemo.transaction.domain.repository.TransactionRepository;
+import com.carddemo.transaction.domain.exception.RemoteServiceException;
 import com.carddemo.transaction.infrastructure.client.AccountClient;
 import com.carddemo.transaction.infrastructure.client.CardClient;
+import com.carddemo.transaction.infrastructure.client.MarketingClient;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -24,6 +27,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -56,6 +60,9 @@ class PostingServiceTest {
 
     @MockBean
     private AccountClient accountClient;
+
+    @MockBean
+    private MarketingClient marketingClient;
 
     private final CardSnapshot card = new CardSnapshot(CARD_NUMBER, ACCOUNT_ID, "000000001",
             "IMMANUEL KESSLER", LocalDate.of(2028, 5, 20), "Y");
@@ -96,6 +103,42 @@ class PostingServiceTest {
     }
 
     @Test
+    void postedTransactionEvaluatesMarketingRewards() {
+        when(cardClient.findCard(CARD_NUMBER)).thenReturn(Optional.of(card));
+        when(accountClient.findAccount(ACCOUNT_ID)).thenReturn(Optional.of(account("5000.00")));
+        when(accountClient.applyPosting(eq(ACCOUNT_ID), any())).thenReturn(account("5000.00"));
+
+        postingService.post(List.of(command("0000000000000104", "75.00")));
+
+        ArgumentCaptor<MarketingClient.RewardEvaluationCommand> captor =
+                ArgumentCaptor.forClass(MarketingClient.RewardEvaluationCommand.class);
+        verify(marketingClient).evaluateRewards(captor.capture());
+        assertThat(captor.getValue()).isEqualTo(new MarketingClient.RewardEvaluationCommand(
+                "0000000000000104", ACCOUNT_ID, CARD_NUMBER, "000000001",
+                new BigDecimal("75.00"), LocalDateTime.of(2026, 10, 25, 10, 15)));
+    }
+
+    @Test
+    void marketingFailureDoesNotRollBackPosting() {
+        when(cardClient.findCard(CARD_NUMBER)).thenReturn(Optional.of(card));
+        when(accountClient.findAccount(ACCOUNT_ID)).thenReturn(Optional.of(account("5000.00")));
+        when(accountClient.applyPosting(eq(ACCOUNT_ID), any())).thenReturn(account("5000.00"));
+        doThrow(new RemoteServiceException("marketing-service is unavailable"))
+                .when(marketingClient).evaluateRewards(any());
+
+        PostingResult result = postingService.post(List.of(command("0000000000000105", "75.00")));
+
+        assertThat(result.status()).isEqualTo("COMPLETED");
+        assertThat(result.posted()).isEqualTo(1);
+        assertThat(result.rejected()).isZero();
+        assertThat(transactions.findByTransactionId("0000000000000105")).isPresent();
+        assertThat(dailyStatus("0000000000000105")).isEqualTo("POSTED");
+        assertThat(balances.find(ACCOUNT_ID, "01", "0001")).get()
+                .extracting(TranCategoryBalance::getBalance)
+                .isEqualTo(new BigDecimal("1275.00"));
+    }
+
+    @Test
     void overlimitTransactionIsRejectedWithoutTouchingDownstreamPostings() {
         when(cardClient.findCard(CARD_NUMBER)).thenReturn(Optional.of(card));
         when(accountClient.findAccount(ACCOUNT_ID)).thenReturn(Optional.of(account("2020.00")));
@@ -112,6 +155,7 @@ class PostingServiceTest {
         });
 
         verify(accountClient, never()).applyPosting(any(), any());
+        verify(marketingClient, never()).evaluateRewards(any());
         assertThat(transactions.findByTransactionId("0000000000000101")).isEmpty();
         assertThat(dailyStatus("0000000000000101")).isEqualTo("REJECTED");
         assertThat(rejectReasonCode("0000000000000101")).isEqualTo(102);

@@ -15,7 +15,7 @@
 | 文档 | 内容 |
 |---|---|
 | [design/01-domain-analysis.md](design/01-domain-analysis.md) | 子域划分、聚合与不变量、领域服务/事件、语义差异 |
-| [design/02-bounded-contexts.md](design/02-bounded-contexts.md) | 26 个限界上下文的职责、边界、数据所有权 |
+| [design/02-bounded-contexts.md](design/02-bounded-contexts.md) | 27 个限界上下文的职责、边界、数据所有权 |
 | [design/03-service-decomposition.md](design/03-service-decomposition.md) | 服务拆分、调用矩阵、失败语义、部署与容量 |
 | [design/04-context-map.md](design/04-context-map.md) | 上下文映射图、集成契约、防腐层 |
 | [design/05-api-catalog.md](design/05-api-catalog.md) | 全部 REST 契约、种子数据契约、错误码总表 |
@@ -29,7 +29,8 @@
 | [design/14-risk-credit-collections.md](design/14-risk-credit-collections.md) | P3：信贷、欺诈、AML、争议、催收、批处理 |
 | [design/15-operations-support.md](design/15-operations-support.md) | P4：报表、通知、文档、工作流、审计、参考数据 |
 | [design/16-channel-and-quality.md](design/16-channel-and-quality.md) | P5/P6：BFF、搜索、门户、性能、混沌与安全 |
-| [design/adr/README.md](design/adr/README.md) | 11 个架构决策记录（MADR） |
+| [design/17-premium-cashback-campaign.md](design/17-premium-cashback-campaign.md) | 高端卡分期返现：需求、影响、架构、Review 与测试 |
+| [design/adr/README.md](design/adr/README.md) | 12 个架构决策记录（MADR） |
 
 ## 3. 运维
 

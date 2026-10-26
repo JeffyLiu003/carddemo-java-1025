@@ -17,6 +17,7 @@ proxy:
   account-service-url: ${ACCOUNT_SERVICE_URL:http://localhost:8084}
   transaction-service-url: ${TRANSACTION_SERVICE_URL:http://localhost:8085}
   authorization-service-url: ${AUTHORIZATION_SERVICE_URL:http://localhost:8086}
+  marketing-service-url: ${MARKETING_SERVICE_URL:http://localhost:8087}
   ledger-service-url: ${LEDGER_SERVICE_URL:http://localhost:8088}
   reconciliation-service-url: ${RECONCILIATION_SERVICE_URL:http://localhost:8089}
   payment-service-url: ${PAYMENT_SERVICE_URL:http://localhost:8091}

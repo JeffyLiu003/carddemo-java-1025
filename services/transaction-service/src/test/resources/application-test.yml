@@ -13,3 +13,5 @@ client:
     base-url: http://localhost:8083
   account-service:
     base-url: http://localhost:8084
+  marketing-service:
+    base-url: http://localhost:8087

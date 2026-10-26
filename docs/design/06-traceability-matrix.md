@@ -75,6 +75,17 @@
 | BR-RPT-01..04 | `TransactionReportService` | `TransactionReportServiceTest` |
 | BR-AUTH-01..13、NR-AUTH-01/02/03 | `AuthorizationService`、`AuthorizationPolicy`、`AuthorizationPurgeService` | `AuthorizationPolicyTest`、`AuthorizationControllerTest` |
 
+## 5. 新增能力：高端卡分期返现
+
+| 能力 | 目标服务 / 接口 | 规则 | 测试 |
+|---|---|---|---|
+| 活动期限与产品圈选 | marketing `POST /campaigns` | PC-01/02 | `CampaignTest` |
+| 报名 | marketing `POST /campaigns/{id}/enrollments` | PC-04/05 | `EnrollmentServiceTest` |
+| 消费返现 | marketing `POST /reward-evaluations` | PC-03/06/07/08/09 | `RewardServiceTest`、`RewardCalculatorTest` |
+| 返现入账/重试 | account `POST /accounts/{id}/credits`；marketing `/rewards/{id}/retry` | PC-10 | `RewardServiceTest`、`AccountControllerTest` |
+| 交易触发 | transaction `PostingService` → marketing | 失败不影响入账 | `PostingServiceTest` |
+| 前台 | web-ui `#/premium-offers`、`#/premium-campaigns` | — | `node --check` + 接口联调 |
+
 ## 6. 覆盖度自检
 
 | 检查项 | 结果 |

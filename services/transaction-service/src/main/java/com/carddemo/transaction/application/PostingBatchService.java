@@ -165,6 +165,20 @@ public class PostingBatchService {
     }
 
     /**
+     * 总账补同步：用于总账短暂不可用后补齐批次分录；已同步的批次直接返回。
+     */
+    public PostingBatchView resyncLedger(String batchId) {
+        PostingBatch batch = postingBatches.findByBatchId(batchId)
+                .orElseThrow(() -> new NotFoundException("POSTING_BATCH_NOT_FOUND",
+                        "Posting batch " + batchId + " not found"));
+        if (batch.getLedgerEntryId() == null) {
+            syncLedger(batch);
+            batch = postingBatches.saveBatch(batch);
+        }
+        return view(batch);
+    }
+
+    /**
      * 总账同步为尽力而为（契约 §2.3）：失败只告警，批次仍然有效，ledgerEntryId 留空。
      */
     private void syncLedger(PostingBatch batch) {

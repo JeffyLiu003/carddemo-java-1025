@@ -31,6 +31,7 @@
 | 参考数据（Reference） | 通用域（新增） | reference-data-service :8106 | `carddemo_reference` | ReferenceItem |
 | BFF | 表现层（新增） | bff-service :8107 | —（无状态） | CustomerOverview |
 | 搜索（Search） | 支撑域（新增） | search-service :8108 | —（无状态） | SearchResult |
+| 营销（Marketing） | 支撑域（新增） | marketing-service :8087 | `carddemo_marketing` | Campaign、Enrollment、RewardGrant |
 | 授权（Authorization） | 核心域 | authorization-service :8086 | `carddemo_authorization` | AuthorizationCase、PendingAuthorizationSummary、CardFraudFlag |
 
 ## 2. 各上下文职责与边界
@@ -150,6 +151,14 @@
 | Reference | 参考项增删改查 | `(domain, code)` 唯一；大小写规范化 |
 | BFF | 客户 360 聚合 | account 失败 404/503；其他下游降级 |
 | Search | 客户/交易搜索 | 类型白名单；下游失败降级 |
+
+### 2.14 Marketing（marketing-service，新增）
+
+- **职责**：高端卡分期返现；活动按产品等级（PLATINUM/GOLD）圈选，期限 1–24 个月；报名、返现评估、奖励重试、活动效果。
+- **聚合**：`Campaign`（状态机 DRAFT→ACTIVE⇄PAUSED→ENDED）、`Enrollment`、`RewardGrant`（幂等键 campaignId+transactionId）。
+- **不变量**：费率 0–1；单笔/客户/预算上限；返现 PENDING 预占；`(sourceType,sourceId)` 由账户贷记保证幂等。
+- **对外契约**：`/api/v1/campaigns`、`/eligibilities`、`/reward-evaluations`、`/rewards`、`/marketing`。
+- **集成**：Transaction 入账后评估（失败只告警）；Account 提供账户产品等级与贷记入账。
 
 ## 3. 跨上下文协作（谁问谁答）
 

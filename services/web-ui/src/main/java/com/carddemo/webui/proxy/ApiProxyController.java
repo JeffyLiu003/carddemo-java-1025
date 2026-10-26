@@ -44,6 +44,7 @@ public class ApiProxyController {
             @Value("${proxy.account-service-url}") String accountServiceUrl,
             @Value("${proxy.transaction-service-url}") String transactionServiceUrl,
             @Value("${proxy.authorization-service-url}") String authorizationServiceUrl,
+            @Value("${proxy.marketing-service-url}") String marketingServiceUrl,
             @Value("${proxy.ledger-service-url}") String ledgerServiceUrl,
             @Value("${proxy.reconciliation-service-url}") String reconciliationServiceUrl,
             @Value("${proxy.payment-service-url}") String paymentServiceUrl,
@@ -82,6 +83,12 @@ public class ApiProxyController {
         routes.put("/api/v1/authorizations", authorizationServiceUrl);
         routes.put("/api/v1/pending-authorizations", authorizationServiceUrl);
         routes.put("/api/v1/authorization-purges", authorizationServiceUrl);
+        // 营销：高端卡分期返现活动、资格、返现评估与奖励
+        routes.put("/api/v1/campaigns", marketingServiceUrl);
+        routes.put("/api/v1/eligibilities", marketingServiceUrl);
+        routes.put("/api/v1/reward-evaluations", marketingServiceUrl);
+        routes.put("/api/v1/rewards", marketingServiceUrl);
+        routes.put("/api/v1/marketing", marketingServiceUrl);
         routes.put("/api/v1/ledger-accounts", ledgerServiceUrl);
         routes.put("/api/v1/journal-entries", ledgerServiceUrl);
         routes.put("/api/v1/trial-balance", ledgerServiceUrl);

@@ -105,6 +105,8 @@ services:
       ACCOUNT_SERVICE_URL: http://account-service:8084
       LEDGER_SERVICE_URL: http://ledger-service:8088
       LEDGER_SYNC_ENABLED: "true"
+      MARKETING_SERVICE_URL: http://marketing-service:8087
+      MARKETING_ENABLED: "true"
     ports:
       - "8085:8085"
     depends_on:
@@ -115,6 +117,8 @@ services:
       account-service:
         condition: service_started
       ledger-service:
+        condition: service_started
+      marketing-service:
         condition: service_started
 
   ledger-service:
@@ -558,6 +562,7 @@ services:
       WORKFLOW_SERVICE_URL: http://workflow-service:8104
       AUDIT_SERVICE_URL: http://audit-service:8105
       REFERENCE_SERVICE_URL: http://reference-data-service:8106
+      MARKETING_SERVICE_URL: http://marketing-service:8087
     ports:
       - "8090:8080"
     depends_on:
@@ -588,6 +593,28 @@ services:
       bff-service:
         condition: service_started
       search-service:
+        condition: service_started
+      marketing-service:
+        condition: service_started
+
+  marketing-service:
+    build:
+      context: ./services/marketing-service
+    container_name: carddemo-marketing
+    environment:
+      SERVER_PORT: 8087
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: carddemo_marketing
+      DB_USER: carddemo
+      DB_PASSWORD: carddemo
+      ACCOUNT_SERVICE_URL: http://account-service:8084
+    ports:
+      - "8087:8087"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      account-service:
         condition: service_started
 
 volumes:

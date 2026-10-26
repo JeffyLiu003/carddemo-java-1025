@@ -693,6 +693,36 @@
 | bff | `/api/v1/bff` | `GET /customer-overview?accountId=` |
 | search | `/api/v1/search` | `GET ?q=&type=&limit=` |
 
+### 7.10 marketing-service 高端卡分期返现
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/v1/campaigns` | 创建活动（DRAFT，201，`durationMonths` 1–24） |
+| GET | `/api/v1/campaigns?status=&page=&size=` | 活动列表 |
+| GET | `/api/v1/campaigns/{id}` | 详情 |
+| POST | `/api/v1/campaigns/{id}/activate` `/pause` `/end` | 状态迁移 |
+| POST | `/api/v1/campaigns/{id}/enrollments` | 报名（幂等） |
+| GET | `/api/v1/campaigns/{id}/enrollments?page=&size=` | 报名列表 |
+| GET | `/api/v1/eligibilities?accountId=&cardNumber=&customerId=` | 客户资格 |
+| POST | `/api/v1/reward-evaluations` | 返现评估（交易入账后调用） |
+| GET | `/api/v1/rewards?accountId=&customerId=&page=&size=` | 返现记录 |
+| POST | `/api/v1/rewards/{rewardId}/retry` | 待入账重试 |
+| GET | `/api/v1/campaigns/{id}/performance` | 效果 |
+| GET | `/api/v1/marketing/summary` | 看板 |
+
+创建活动示例：
+
+```json
+{"code":"PLATINUM_3M_CASHBACK","name":"白金卡 3 个月消费返现",
+ "startDate":"2026-10-01","durationMonths":3,
+ "eligibleProductCodes":["PLATINUM"],"minTransactionAmount":50.00,
+ "cashbackRate":0.05,"maxCashbackPerTransaction":30.00,
+ "maxCashbackPerCustomer":300.00,"budget":50000.00,"enrollmentRequired":true}
+```
+
+账户贷记：`POST /api/v1/accounts/{accountId}/credits`
+`{"creditId":"...","sourceType":"CASHBACK","amount":30.00,"description":"..."}`，`creditId` 幂等。
+
 ## 8. 错误码总表
 
 | code | HTTP | 归属 | 含义 |
@@ -779,6 +809,19 @@
 | INVALID_QUOTE_AMOUNT | 409 | fx | 报价金额非法 |
 | INVALID_RATE | 409 | fx | 汇率非法 |
 | SAME_CURRENCY | 409 | fx | 换入换出币种相同 |
+| CAMPAIGN_NOT_FOUND | 404 | marketing | 活动不存在 |
+| CAMPAIGN_CODE_EXISTS | 409 | marketing | 活动编码重复 |
+| INVALID_CAMPAIGN | 409 | marketing | 期限/费率/上限/预算非法 |
+| INVALID_CAMPAIGN_STATE | 409 | marketing | 非法状态迁移 |
+| NOT_ENROLLED | 409 | marketing | 未报名 |
+| PRODUCT_NOT_ELIGIBLE | 409 | marketing | 产品等级不匹配 |
+| OUTSIDE_WINDOW | 409 | marketing | 不在活动期限 |
+| AMOUNT_TOO_LOW | 409 | marketing | 未达最低消费 |
+| CUSTOMER_CAP_REACHED | 409 | marketing | 客户返现上限已满 |
+| BUDGET_EXHAUSTED | 409 | marketing | 活动预算已用完 |
+| REWARD_NOT_FOUND | 404 | marketing | 返现记录不存在 |
+| INVALID_CREDIT_AMOUNT | 409 | account | 贷记金额非法 |
+| CREDIT_ID_CONFLICT | 409 | account | 贷记幂等键跨账户复用 |
 | NOTHING_TO_PAY | 409 | account/transaction | 无欠款，不能还款 |
 | PAYMENT_EXCEEDS_BALANCE | 409 | account | 还款金额超过余额 |
 | INVALID_PAYMENT_AMOUNT | 409 | account | 还款金额 ≤ 0 |

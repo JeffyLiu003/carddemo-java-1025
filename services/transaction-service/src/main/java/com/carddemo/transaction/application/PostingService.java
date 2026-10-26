@@ -13,6 +13,10 @@ import com.carddemo.transaction.domain.repository.TransactionRepository;
 import com.carddemo.transaction.domain.service.PostingPolicy;
 import com.carddemo.transaction.infrastructure.client.AccountClient;
 import com.carddemo.transaction.infrastructure.client.CardClient;
+import com.carddemo.transaction.infrastructure.client.MarketingClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +33,7 @@ import java.util.Optional;
 @Transactional
 public class PostingService {
 
+    private static final Logger log = LoggerFactory.getLogger(PostingService.class);
     private static final BigDecimal ZERO = new BigDecimal("0.00");
 
     private final TransactionRepository transactions;
@@ -37,7 +42,9 @@ public class PostingService {
     private final TransactionIdGenerator idGenerator;
     private final CardClient cardClient;
     private final AccountClient accountClient;
+    private final MarketingClient marketingClient;
     private final PostingPolicy postingPolicy;
+    private final boolean marketingEnabled;
 
     public PostingService(TransactionRepository transactions,
                           DailyTransactionRepository dailyTransactions,
@@ -45,14 +52,18 @@ public class PostingService {
                           TransactionIdGenerator idGenerator,
                           CardClient cardClient,
                           AccountClient accountClient,
-                          PostingPolicy postingPolicy) {
+                          MarketingClient marketingClient,
+                          PostingPolicy postingPolicy,
+                          @Value("${marketing.enabled:true}") boolean marketingEnabled) {
         this.transactions = transactions;
         this.dailyTransactions = dailyTransactions;
         this.balances = balances;
         this.idGenerator = idGenerator;
         this.cardClient = cardClient;
         this.accountClient = accountClient;
+        this.marketingClient = marketingClient;
         this.postingPolicy = postingPolicy;
+        this.marketingEnabled = marketingEnabled;
     }
 
     public PostingResult post(List<PostingCommand> commands) {
@@ -112,10 +123,33 @@ public class PostingService {
                     TransactionStatus.POSTED);
             transactions.saveTransaction(record);
             dailyTransactions.saveDailyTransaction(DailyTransaction.posted(record));
+            evaluateRewards(record, card);
             posted++;
         }
 
         String status = rejected > 0 ? "COMPLETED_WITH_REJECTS" : "COMPLETED";
         return new PostingResult(status, commands.size(), posted, rejected, rejections, duplicates);
+    }
+
+    /**
+     * 入账成功后尽力评估营销返现（docs/design/17-premium-cashback-campaign.md §3.3）：
+     * 资金事实优先，营销调用失败只告警，不回滚已完成的入账。
+     */
+    private void evaluateRewards(TransactionRecord record, CardSnapshot card) {
+        if (!marketingEnabled) {
+            return;
+        }
+        try {
+            marketingClient.evaluateRewards(new MarketingClient.RewardEvaluationCommand(
+                    record.getTransactionId(),
+                    record.getAccountId(),
+                    record.getCardNumber(),
+                    card.customerId(),
+                    record.getAmount(),
+                    record.getOriginalTimestamp()));
+        } catch (RuntimeException ex) {
+            log.warn("Reward evaluation failed for transaction {}: {}",
+                    record.getTransactionId(), ex.getMessage());
+        }
     }
 }

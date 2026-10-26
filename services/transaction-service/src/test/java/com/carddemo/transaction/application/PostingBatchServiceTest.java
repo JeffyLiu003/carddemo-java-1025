@@ -173,6 +173,23 @@ class PostingBatchServiceTest {
     }
 
     @Test
+    void resyncLedgerCompletesMissingJournal() {
+        when(ledgerClient.recordJournalEntry(any()))
+                .thenThrow(new RemoteServiceException("ledger-service is unavailable"))
+                .thenReturn("JE-RESYNC");
+
+        PostingBatch batch = postingBatchService
+                .create(command("post-0008b", "CARD_PURCHASE", "25.00")).batch();
+        assertThat(batch.getLedgerEntryId()).isNull();
+
+        PostingBatch resynced = postingBatchService.resyncLedger(batch.getBatchId()).batch();
+
+        assertThat(resynced.getLedgerEntryId()).isEqualTo("JE-RESYNC");
+        assertThat(postingBatches.findByBatchId(batch.getBatchId()))
+                .get().extracting(PostingBatch::getLedgerEntryId).isEqualTo("JE-RESYNC");
+    }
+
+    @Test
     void inactivePostingTypeIsRejected() {
         jdbcTemplate.update("update posting_type set active = false where type_code = 'FEE'");
 

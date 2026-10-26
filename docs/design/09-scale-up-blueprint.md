@@ -37,8 +37,8 @@
 | web-ui | 4 | 241 | - | 静态页面 + 反向代理 |
 | **合计** | **298** | **15,717** | **54** | 36 张表、197 个测试 |
 
-> 上表为规模化分析时的快照。A1.1–A1.4、P2、P3–P5 落地后：全仓 48,374 行 Java / 903 个文件 / 762 个测试，
-> 26 个业务服务 + web-ui；默认 16 个容器，`--profile extended` 追加 12 个扩展服务。
+> 上表为规模化分析时的快照。A1.1–A1.4、P2、P3–P5 与高端返现落地后：全仓 53,107 行 Java / 968 个文件 / 816 个测试，
+> 27 个业务服务 + web-ui；默认 17 个容器，`--profile extended` 追加 12 个扩展服务。
 
 补充事实：
 
@@ -110,6 +110,7 @@
 | Core | 账单与计费 | billing-service |
 | Core | 风险与反欺诈 | fraud-service、aml-service |
 | Supporting | 客户与 KYC | customer-service |
+| Supporting | 营销与忠诚度 | marketing-service |
 | Supporting | 对账与运营 | reconciliation-service、batch-service、reporting-service |
 | Supporting | 争议与催收 | dispute-service、collections-service |
 | Supporting | 通知与文档 | notification-service、document-service |
@@ -133,6 +134,7 @@
 | account-service | 1,050 | 产品参数、透支、冻结/预留、计息、费用、对账单、销户、多币种 | 60,000 | 60 | 40 |
 | transaction-service | 4,189 | 30+ 交易类型、过账引擎、转账、standing order、bill pay、冲正、定时任务 | 70,000 | 70 | 45 |
 | authorization-service | 2,660 | 决策流水线、velocity、限额、欺诈评分、3DS、部分批准、stand-in | 45,000 | 35 | 25 |
+| marketing-service | 新增 | 高端卡分期返现、产品圈选、报名、返现上限/预算、效果 | 35,000 | 45 | 20 |
 | reconciliation-service | 1,800 | 对账/EOD、差异处理、补偿 | 45,000 | 35 | 30 |
 | payment-service | 新增 | ACH/SEPA/电汇/RTP、ISO 20022、SWIFT、截止时间、退汇、筛查 | 80,000 | 80 | 50 |
 | ledger-service | 新增 | 科目表、日记账、过账规则、期间关账、试算平衡、子账对账 | 45,000 | 35 | 30 |

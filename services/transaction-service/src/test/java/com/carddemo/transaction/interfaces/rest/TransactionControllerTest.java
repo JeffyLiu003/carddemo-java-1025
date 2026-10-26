@@ -6,6 +6,7 @@ import com.carddemo.transaction.domain.exception.RemoteServiceException;
 import com.carddemo.transaction.domain.repository.TransactionRepository;
 import com.carddemo.transaction.infrastructure.client.AccountClient;
 import com.carddemo.transaction.infrastructure.client.CardClient;
+import com.carddemo.transaction.infrastructure.client.MarketingClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -60,6 +61,9 @@ class TransactionControllerTest {
 
     @MockBean
     private AccountClient accountClient;
+
+    @MockBean
+    private MarketingClient marketingClient;
 
     private final CardSnapshot card = new CardSnapshot(CARD_NUMBER, ACCOUNT_ID, "000000001",
             "IMMANUEL KESSLER", LocalDate.of(2028, 5, 20), "Y");

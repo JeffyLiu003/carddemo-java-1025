@@ -30,11 +30,16 @@ client:
     base-url: ${ACCOUNT_SERVICE_URL:http://localhost:8084}
   ledger-service:
     base-url: ${LEDGER_SERVICE_URL:http://localhost:8088}
+  marketing-service:
+    base-url: ${MARKETING_SERVICE_URL:http://localhost:8087}
   connect-timeout: 3s
   read-timeout: 3s
 
 ledger:
   sync-enabled: ${LEDGER_SYNC_ENABLED:true}
+
+marketing:
+  enabled: ${MARKETING_ENABLED:true}
 
 management:
   endpoints:

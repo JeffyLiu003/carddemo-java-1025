@@ -71,4 +71,10 @@ public class PostingBatchController {
     public PostingBatchResponse reverse(@PathVariable String batchId) {
         return PostingBatchResponse.from(postingBatchService.reverse(batchId));
     }
+
+    @Operation(summary = "补同步总账", description = "总账短暂不可用后补齐批次分录；已同步的批次直接返回。")
+    @PostMapping("/{batchId}/ledger-sync")
+    public PostingBatchResponse resyncLedger(@PathVariable String batchId) {
+        return PostingBatchResponse.from(postingBatchService.resyncLedger(batchId));
+    }
 }

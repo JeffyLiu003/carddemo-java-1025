@@ -13,3 +13,4 @@
 | ADR-010 | 过账引擎与总账的职责分离 | 已接受 | `11-money-path-slice-a2.md` §2–3 |
 | ADR-011 | 对账只读与差异处理边界 | 已接受 | `12-reconciliation-and-eod.md` §2、§5 |
 | ADR-012 | 支付清算通过过账批次落账 | 已接受 | `13-payments-billing-limits-fx.md` §2 |
+| ADR-013 | 高端卡分期返现采用独立营销上下文 | 已接受 | `17-premium-cashback-campaign.md` |

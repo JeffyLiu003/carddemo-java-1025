@@ -96,4 +96,4 @@
 3. 四个新页面可操作核心链路；导航/代理正确。
 4. k6 脚本可执行；chaos 脚本可停止/恢复 ledger。
 5. `mvn verify` 生成 JaCoCo 报告；ArchUnit 通过。
-6. 默认 Compose 16 个容器（核心 14 + BFF + 搜索）；`--profile extended` 追加 12 个扩展服务。
+6. 默认 Compose 17 个容器（核心 15 + BFF + 搜索）；`--profile extended` 追加 12 个扩展服务。

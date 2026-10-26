@@ -2,7 +2,7 @@
 
 把 AWS CardDemo（CICS/COBOL 信用卡核心演示系统）迁移为基于 **DDD 限界上下文**的 Java 微服务工程。
 本项目不是逐行翻译 COBOL，而是：先提取存量业务知识（L1–L5 五层模型 + 业务规则目录），
-再按领域边界划分 26 个微服务（6 个既有业务域 + 总账、对账、支付、账单、限额、汇率、信贷、风险、运营、渠道），最后用 Spring Boot 3 落地，并提供面向业务人员的 Web 界面与
+再按领域边界划分 27 个微服务（6 个既有业务域 + 营销、总账、对账、支付、账单、限额、汇率、信贷、风险、运营、渠道），最后用 Spring Boot 3 落地，并提供面向业务人员的 Web 界面与
 Docker Compose 调试运行能力。
 
 ## 1. 架构总览
@@ -21,6 +21,7 @@ graph LR
     subgraph 支撑/通用域
       CUST[customer-service :8082<br/>客户主数据]
       IAM[iam-service :8081<br/>登录/用户]
+      MKT[marketing-service :8087<br/>高端卡分期返现]
       RECON[reconciliation-service :8089<br/>对账/差异处理/EOD]
       BILL[billing-service :8092<br/>账单/利息/最低还款]
       LIMIT[limit-service :8093<br/>限额/用量]
@@ -31,7 +32,7 @@ graph LR
       BFF[bff-service :8107<br/>客户 360 聚合]
       SEARCH[search-service :8108<br/>统一搜索]
     end
-    DB[(PostgreSQL 16<br/>24 个独立 database)]
+    DB[(PostgreSQL 16<br/>25 个独立 database)]
 
     WEB -. /api/** 代理 .-> IAM
     WEB -.-> CUST
@@ -39,6 +40,7 @@ graph LR
     WEB -.-> ACCT
     WEB -.-> TXN
     WEB -.-> AUTH
+    WEB -.-> MKT
     WEB -.-> LEDGER
     WEB -.-> RECON
     WEB -.-> PAY
@@ -53,6 +55,7 @@ graph LR
     ACCT --> AUTH
     CUST -.-> AUTH
     IAM -. token 契约（POC 未强制） .-> TXN
+    TXN -. 入账后返现评估 .-> MKT
     TXN -. 过账后同步日记账 .-> LEDGER
     RECON -. 读取批次/日记账 .-> TXN
     RECON -. 读取日记账/试算平衡 .-> LEDGER
@@ -64,6 +67,7 @@ graph LR
     BFF -. 聚合 .-> TXN
     SEARCH -. 查询 .-> CUST
     SEARCH -. 查询 .-> TXN
+    MKT -. 返现贷记 .-> ACCT
     TXN --> DB
     LEDGER --> DB
     RECON --> DB
@@ -96,6 +100,7 @@ graph LR
 | billing-service | 8092 | `carddemo_billing` | **新增能力**：账单生成、利息/最低还款、账单支付 |
 | limit-service | 8093 | `carddemo_limit` | **新增能力**：客户/账户/渠道限额、用量与校验 |
 | fx-service | 8094 | `carddemo_fx` | **新增能力**：汇率维护、报价、换汇记录 |
+| marketing-service | 8087 | `carddemo_marketing` | **新增能力**：高端卡分期返现（白金/金卡、1–24 个月、返现上限/预算/报名） |
 | loan-service | 8095 | `carddemo_loan` | **新增能力**：贷款申请、审批、放款、等额本息计划、还款 |
 | fraud-service | 8096 | `carddemo_fraud` | **新增能力**：欺诈规则评分、警报与处置 |
 | aml-service | 8097 | `carddemo_aml` | **新增能力**：制裁/名单筛查、AML 警报 |
@@ -117,8 +122,8 @@ graph LR
 ```
 carddemo-java-1025/
 ├── pom.xml                      # Maven 聚合父 POM（Spring Boot 3.3.6 / Java 21）
-├── docker-compose.yml           # PostgreSQL + 14 个默认微服务 + Web 界面；extended profile 追加 12 个
-├── docker/postgres/init/        # 24 个 database 初始化
+├── docker-compose.yml           # PostgreSQL + 15 个默认微服务 + Web 界面；extended profile 追加 12 个
+├── docker/postgres/init/        # 25 个 database 初始化
 ├── scripts/build-and-up.sh      # 打包 + 构建镜像 + 启动
 ├── scripts/smoke-test.sh        # 端到端冒烟测试
 ├── docs/
@@ -137,6 +142,7 @@ carddemo-java-1025/
     ├── billing-service/          # 账单：生成/利息/最低还款/支付（新增）
     ├── limit-service/            # 限额：额度/用量/校验（新增）
     ├── fx-service/               # 汇率：报价/换汇（新增）
+    ├── marketing-service/        # 高端卡分期返现（新增）
     ├── loan-service/             # 信贷：申请/审批/放款/还款（新增）
     ├── fraud-service/            # 欺诈评分/警报（新增）
     ├── aml-service/              # 制裁筛查/AML 警报（新增）
@@ -186,7 +192,7 @@ docker compose ps
 全部单元/集成测试：
 
 ```bash
-mvn test        # 762 个用例，H2 + Flyway，多模块并行
+mvn test        # 816 个用例，H2 + Flyway，多模块并行
 ```
 
 ## 3.1 Web 界面（推荐）
@@ -205,6 +211,8 @@ mvn test        # 762 个用例，H2 + Flyway，多模块并行
 | 账单 | 生成账单、查看利息/最低还款/到期日、全额支付（P2 新增） | 新增能力 |
 | 限额 | 创建/调整限额、占用/释放、可用性检查（管理员，P2 新增） | 新增能力 |
 | 汇率 | 汇率维护、报价、执行换汇、换汇记录（P2 新增） | 新增能力 |
+| 高端返现 | 白金/金卡分期活动、报名、消费返现、待入账重试 | 新增能力 |
+| 返现活动 | 创建 1–24 个月活动、产品圈选、发布/暂停/结束、效果（管理员） | 新增能力 |
 | 客户 360 | BFF 聚合账户/卡片/客户/交易/权益，统一搜索（P5 新增） | 新增能力 |
 | 贷款 | 申请、审批/拒绝、放款、还款计划、还款（P3 新增） | 新增能力 |
 | 风险 | 欺诈评分/警报、AML 筛查/警报、争议、催收（P3 新增） | 新增能力 |
@@ -243,6 +251,7 @@ SSN 始终为掩码，CVV 不返回。
 | billing | http://localhost:8092/ | http://localhost:8092/v3/api-docs |
 | limit | http://localhost:8093/ | http://localhost:8093/v3/api-docs |
 | fx | http://localhost:8094/ | http://localhost:8094/v3/api-docs |
+| marketing | http://localhost:8087/ | http://localhost:8087/v3/api-docs |
 | loan | http://localhost:8095/ | http://localhost:8095/v3/api-docs |
 | fraud | http://localhost:8096/ | http://localhost:8096/v3/api-docs |
 | aml | http://localhost:8097/ | http://localhost:8097/v3/api-docs |
@@ -329,6 +338,8 @@ curl -s -X POST localhost:8089/api/v1/eod-runs \
   识别缺失、金额不符与孤儿分录；差异可登记处理；EOD 触发对账并留痕。见 `docs/design/12-reconciliation-and-eod.md`。
 - **支付与计费（新增）**：支付指令受理→筛查→接受→清算（过账批次）→退汇（冲正）；
   账单按账户/期间生成，计算利息与最低还款并支持全额支付；限额与 FX 独立服务。见 `docs/design/13-payments-billing-limits-fx.md`。
+- **高端卡返现（新增）**：按产品等级圈选（PLATINUM/GOLD），活动期限 1–24 个月；报名后活动期内消费按比例返现，
+  受单笔/客户/预算上限约束；返现通过 account 贷记入账，失败 PENDING 可重试。见 `docs/design/17-premium-cashback-campaign.md`。
 
 ## 6. 文档
 
@@ -337,7 +348,7 @@ curl -s -X POST localhost:8089/api/v1/eod-runs \
 | [docs/README.md](docs/README.md) | 全部文档索引 |
 | [docs/legacy/02-five-level-model.md](docs/legacy/02-five-level-model.md) | L1–L5 业务模型（带证据） |
 | [docs/legacy/03-business-rule-catalog.md](docs/legacy/03-business-rule-catalog.md) | 业务规则 → 实现落点 → 状态 |
-| [docs/design/02-bounded-contexts.md](docs/design/02-bounded-contexts.md) | 26 个限界上下文 |
+| [docs/design/02-bounded-contexts.md](docs/design/02-bounded-contexts.md) | 27 个限界上下文 |
 | [docs/design/05-api-catalog.md](docs/design/05-api-catalog.md) | 全部 API 契约与种子数据 |
 | [docs/design/06-traceability-matrix.md](docs/design/06-traceability-matrix.md) | 44 个遗留程序的去向（总账/对账/支付/账单为新增能力） |
 | [docs/design/09-scale-up-blueprint.md](docs/design/09-scale-up-blueprint.md) | 规模化蓝图与分阶段路线图 |
@@ -348,7 +359,8 @@ curl -s -X POST localhost:8089/api/v1/eod-runs \
 | [docs/design/14-risk-credit-collections.md](docs/design/14-risk-credit-collections.md) | P3：信贷、欺诈、AML、争议、催收、批处理 |
 | [docs/design/15-operations-support.md](docs/design/15-operations-support.md) | P4：报表、通知、文档、工作流、审计、参考数据 |
 | [docs/design/16-channel-and-quality.md](docs/design/16-channel-and-quality.md) | P5/P6：BFF、搜索、门户、性能、混沌与安全 |
-| [docs/design/adr/README.md](docs/design/adr/README.md) | 11 个架构决策 |
+| [docs/design/17-premium-cashback-campaign.md](docs/design/17-premium-cashback-campaign.md) | 高端卡分期返现：需求、影响、架构、Review 与测试 |
+| [docs/design/adr/README.md](docs/design/adr/README.md) | 12 个架构决策 |
 | [docs/ops/01-docker-runbook.md](docs/ops/01-docker-runbook.md) | Docker 调试运行手册 |
 
 ## 7. 已知限制（POC 范围）
@@ -369,5 +381,7 @@ curl -s -X POST localhost:8089/api/v1/eod-runs \
 10. **P3/P4/P5 为演示级**：贷款/欺诈/AML/争议/催收为单聚合状态机；批处理同步调用、无调度器；
     报表/通知/文档/工作流/审计/参考数据为轻量实现；搜索为实时过滤，无 OpenSearch 索引；
     BFF 串行聚合，未做并行/缓存。
-11. **扩展服务默认不启动**：为控制内存，P3/P4 的 12 个服务放在 Compose `extended` profile，
-    使用 `docker compose --profile extended up -d` 启动；默认运行 16 个容器。
+11. **高端返现为演示级**：预算/客户上限为单实例保护；报名未二次校验 customerId 与卡归属；
+    本期不含积分、A/B、复杂客群 DSL；返现失败保留 PENDING 可重试。
+12. **扩展服务默认不启动**：为控制内存，P3/P4 的 12 个服务放在 Compose `extended` profile，
+    使用 `docker compose --profile extended up -d` 启动；默认运行 17 个容器。

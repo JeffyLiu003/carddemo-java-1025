@@ -9,6 +9,7 @@ ACCOUNT=${ACCOUNT:-http://localhost:8084}
 TRANSACTION=${TRANSACTION:-http://localhost:8085}
 AUTHORIZATION=${AUTHORIZATION:-http://localhost:8086}
 LEDGER=${LEDGER:-http://localhost:8088}
+MARKETING=${MARKETING:-http://localhost:8087}
 RECONCILIATION=${RECONCILIATION:-http://localhost:8089}
 PAYMENT=${PAYMENT:-http://localhost:8091}
 BILLING=${BILLING:-http://localhost:8092}
@@ -18,17 +19,17 @@ FX=${FX:-http://localhost:8094}
 say() { printf '\n== %s\n' "$*"; }
 json() { python3 -c "import json,sys; d=json.load(sys.stdin); print(json.dumps(d, ensure_ascii=False)[:400])"; }
 
-say "1/8 健康探针"
-for svc in "$IAM" "$CUSTOMER" "$CARD" "$ACCOUNT" "$TRANSACTION" "$AUTHORIZATION" "$LEDGER" "$RECONCILIATION" "$PAYMENT" "$BILLING" "$LIMIT" "$FX"; do
+say "1/9 健康探针"
+for svc in "$IAM" "$CUSTOMER" "$CARD" "$ACCOUNT" "$TRANSACTION" "$AUTHORIZATION" "$LEDGER" "$MARKETING" "$RECONCILIATION" "$PAYMENT" "$BILLING" "$LIMIT" "$FX"; do
   status=$(curl -sf -m 5 "$svc/actuator/health" | python3 -c "import json,sys; print(json.load(sys.stdin)['status'])")
   echo "  $svc -> $status"
 done
 
-say "2/8 登录（ADMIN001）"
+say "2/9 登录（ADMIN001）"
 curl -sf -m 5 -X POST "$IAM/api/v1/auth/login" -H 'Content-Type: application/json' \
   -d '{"userId":"admin001","password":"admin123"}' | json
 
-say "3/8 账户 / 客户 / 卡片 / 产品与额度"
+say "3/9 账户 / 客户 / 卡片 / 产品与额度"
 curl -sf -m 5 "$ACCOUNT/api/v1/accounts/00000000001" | json
 curl -sf -m 5 "$CUSTOMER/api/v1/customers/000000001" | json
 curl -sf -m 5 "$CARD/api/v1/cards/by-account/00000000001" | json
@@ -36,7 +37,7 @@ curl -sf -m 5 "$ACCOUNT/api/v1/account-products" \
   | python3 -c "import json,sys; d=json.load(sys.stdin); print('products:', [(i['productCode'], i['maxCreditLimit']) for i in d['items']])"
 curl -sf -m 5 "$ACCOUNT/api/v1/accounts/00000000006/credit-position" | json
 
-say "4/8 日终入账（金额 1.00，交易号按时间生成，可重复执行）"
+say "4/9 日终入账（金额 1.00，交易号按时间生成，可重复执行）"
 TXN_ID=$(printf "%016d" "$(date +%s)")
 curl -sf -m 10 -X POST "$TRANSACTION/api/v1/postings" -H 'Content-Type: application/json' -d "{
   \"transactions\":[{
@@ -48,13 +49,13 @@ curl -sf -m 10 -X POST "$TRANSACTION/api/v1/postings" -H 'Content-Type: applicat
     \"merchantId\":\"800000001\",\"merchantName\":\"Smoke Test\",
     \"merchantCity\":\"Springfield\",\"merchantZip\":\"10001\"}]}" | json
 
-say "5/8 授权决策（账户 1，可用额度 80.00）"
+say "5/9 授权决策（账户 1，可用额度 80.00）"
 curl -sf -m 10 -X POST "$AUTHORIZATION/api/v1/authorizations" -H 'Content-Type: application/json' -d '{
   "cardNumber":"0500024453765740","transactionAmount":10.00,
   "transactionId":"SMOKE0000000001","merchantName":"Corner Grocery"}' | json
 curl -sf -m 5 "$AUTHORIZATION/api/v1/pending-authorizations/00000000001" | json
 
-say "5.1/8 资金冻结：创建、查额度、释放（账户 6）"
+say "5.1/9 资金冻结：创建、查额度、释放（账户 6）"
 HOLD_REF="smoke-hold-$(date +%s)"
 HOLD_ID=$(curl -sf -m 10 -X POST "$ACCOUNT/api/v1/accounts/00000000006/holds" \
   -H 'Content-Type: application/json' \
@@ -64,7 +65,7 @@ echo "  holdId=$HOLD_ID"
 curl -sf -m 5 "$ACCOUNT/api/v1/accounts/00000000006/credit-position" | json
 curl -sf -m 5 -X DELETE "$ACCOUNT/api/v1/accounts/00000000006/holds/$HOLD_ID" | json
 
-say "5.2/8 过账与总账：创建批次 → 日记账 → 试算平衡 → 冲正"
+say "5.2/9 过账与总账：创建批次 → 日记账 → 试算平衡 → 冲正"
 POST_KEY="smoke-post-$(date +%s)"
 BATCH_ID=$(curl -sf -m 10 -X POST "$TRANSACTION/api/v1/posting-batches" \
   -H 'Content-Type: application/json' \
@@ -78,7 +79,7 @@ curl -sf -m 5 "$LEDGER/api/v1/trial-balance?period=$(date +%Y-%m)" \
 curl -sf -m 10 -X POST "$TRANSACTION/api/v1/posting-batches/$BATCH_ID/reversal" \
   | python3 -c "import json,sys; d=json.load(sys.stdin); print('reversal:', d['batchId'], d['status'], d['reversalOf'])"
 
-say "5.3/8 对账与 EOD"
+say "5.3/9 对账与 EOD"
 TODAY=$(date +%F)
 curl -sf -m 15 -X POST "$RECONCILIATION/api/v1/reconciliation-runs" \
   -H 'Content-Type: application/json' -d "{\"businessDate\":\"$TODAY\"}" \
@@ -87,7 +88,7 @@ curl -sf -m 15 -X POST "$RECONCILIATION/api/v1/eod-runs" \
   -H 'Content-Type: application/json' -d "{\"businessDate\":\"$TODAY\"}" \
   | python3 -c "import json,sys; d=json.load(sys.stdin); print('eod:', d['status'], d['reconciliationRunId'])"
 
-say "5.4/8 支付 / 账单 / 限额 / 汇率"
+say "5.4/9 支付 / 账单 / 限额 / 汇率"
 PAY_KEY="smoke-pay-$(date +%s)"
 PAY_ID=$(curl -sf -m 10 -X POST "$PAYMENT/api/v1/payment-orders" \
   -H 'Content-Type: application/json' \
@@ -111,14 +112,33 @@ QUOTE_ID=$(curl -sf -m 10 -X POST "$FX/api/v1/fx/quotes" \
 curl -sf -m 10 -X POST "$FX/api/v1/fx/quotes/$QUOTE_ID/execute" \
   | python3 -c "import json,sys; d=json.load(sys.stdin); print('  fx:', d['sourceAmount'], d['fromCurrency'], '->', d['convertedAmount'], d['toCurrency'])"
 
-say "6/8 交易列表（前 2 条）"
+say "6/9 交易列表（前 2 条）"
 curl -sf -m 5 "$TRANSACTION/api/v1/transactions?page=0&size=2" | json
 
-say "7/8 交易报表（2026-09 闭区间）"
+say "7/9 交易报表（2026-09 闭区间）"
 curl -sf -m 10 "$TRANSACTION/api/v1/reports/transactions?startDate=2026-09-01&endDate=2026-09-30" \
   | python3 -c "import json,sys; d=json.load(sys.stdin); print({k: d[k] for k in ('total','pageTotal','grandTotal')})"
 
-say "8/8 BFF 客户 360 与统一搜索"
+say "8/9 高端卡分期返现：报名 → 消费 → 返现"
+CAMP_ID=$(curl -sf -m 10 "$MARKETING/api/v1/campaigns?page=0&size=10" \
+  | python3 -c "import json,sys; print([i['campaignId'] for i in json.load(sys.stdin)['items'] if i['code']=='PLATINUM_3M_CASHBACK'][0])")
+curl -sf -m 10 -X POST "$MARKETING/api/v1/campaigns/$CAMP_ID/enrollments" \
+  -H 'Content-Type: application/json' \
+  -d '{"accountId":"00000000006","cardNumber":"3344556677889900","customerId":"000000006"}' \
+  | python3 -c "import json,sys; d=json.load(sys.stdin); print('enrolled:', d['status'])"
+CASHBACK_TXN_ID=$(date +%s%N | cut -c1-16)
+curl -sf -m 10 -X POST "$TRANSACTION/api/v1/postings" -H 'Content-Type: application/json' -d "{
+  \"transactions\":[{\"transactionId\":\"$CASHBACK_TXN_ID\",\"cardNumber\":\"3344556677889900\",
+  \"typeCode\":\"01\",\"categoryCode\":\"0001\",\"source\":\"POS TERM\",
+  \"description\":\"Smoke premium cashback\",\"amount\":100.00,
+  \"originalTimestamp\":\"$(date +%Y-%m-%dT10:15:00)\",\"merchantId\":\"800000001\",
+  \"merchantName\":\"Luxury Store\",\"merchantCity\":\"Springfield\",\"merchantZip\":\"10001\"}]}" \
+  | python3 -c "import json,sys; d=json.load(sys.stdin); print('posting:', d['status'], d['posted'])"
+sleep 1
+curl -sf -m 10 "$MARKETING/api/v1/rewards?accountId=00000000006&page=0&size=5" \
+  | python3 -c "import json,sys; d=json.load(sys.stdin); print('rewards:', d['total'], [(i['campaignCode'], i['cashbackAmount'], i['status']) for i in d['items'][:2]])"
+
+say "9/9 BFF 客户 360 与统一搜索"
 curl -sf -m 5 "http://localhost:8107/api/v1/bff/customer-overview?accountId=00000000001" \
   | python3 -c "import json,sys; d=json.load(sys.stdin); print('bff:', d['accountId'], 'cards=', len(d['cards']), 'degraded=', d['degraded'])"
 curl -sf -m 5 "http://localhost:8108/api/v1/search?q=Kessler&type=CUSTOMER" \

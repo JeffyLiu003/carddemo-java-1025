@@ -59,6 +59,51 @@ class AccountTest {
     }
 
     @Test
+    void creditReducesOutstandingBalanceWithoutTouchingCycleTotals() {
+        Account account = account("100.00");
+
+        account.applyCredit(new BigDecimal("30.00"));
+
+        assertThat(account.getCurrentBalance()).isEqualByComparingTo("70.00");
+        assertThat(account.getCurrentCycleCredit()).isEqualByComparingTo("0.00");
+        assertThat(account.getCurrentCycleDebit()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void creditAllowsOverpaymentToDriveBalanceNegative() {
+        Account account = account("20.00");
+
+        account.applyCredit(new BigDecimal("30.00"));
+
+        assertThat(account.getCurrentBalance()).isEqualByComparingTo("-10.00");
+    }
+
+    @Test
+    void creditRejectsNonPositiveAmount() {
+        Account account = account("100.00");
+
+        assertThatThrownBy(() -> account.applyCredit(new BigDecimal("0.00")))
+                .isInstanceOf(BusinessRuleException.class)
+                .extracting("code").isEqualTo("INVALID_CREDIT_AMOUNT");
+        assertThatThrownBy(() -> account.applyCredit(new BigDecimal("-5.00")))
+                .isInstanceOf(BusinessRuleException.class)
+                .extracting("code").isEqualTo("INVALID_CREDIT_AMOUNT");
+        assertThatThrownBy(() -> account.applyCredit(null))
+                .isInstanceOf(BusinessRuleException.class)
+                .extracting("code").isEqualTo("INVALID_CREDIT_AMOUNT");
+        assertThat(account.getCurrentBalance()).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    void creditRejectsMoreThanTwoDecimalPlaces() {
+        Account account = account("100.00");
+
+        assertThatThrownBy(() -> account.applyCredit(new BigDecimal("1.005")))
+                .isInstanceOf(BusinessRuleException.class)
+                .extracting("code").isEqualTo("INVALID_CREDIT_AMOUNT");
+    }
+
+    @Test
     void interestAccrualResetsCycleTotals() {
         Account account = account("100.00");
         account.applyPosting(new BigDecimal("40.00"));

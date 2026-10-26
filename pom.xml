@@ -44,6 +44,7 @@
         <module>services/reference-data-service</module>
         <module>services/bff-service</module>
         <module>services/search-service</module>
+        <module>services/marketing-service</module>
         <module>services/authorization-service</module>
         <module>services/web-ui</module>
     </modules>

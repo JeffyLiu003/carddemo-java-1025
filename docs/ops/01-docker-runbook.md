@@ -52,7 +52,7 @@ docker compose --profile extended ps
 ./scripts/smoke-test.sh
 ```
 
-覆盖：默认 12 个健康探针、登录、账户/客户/卡、冻结、过账/总账/对账/EOD、支付/账单/限额/FX、BFF/搜索。
+覆盖：默认 13 个健康探针、登录、账户/客户/卡、冻结、过账/总账/对账/EOD、支付/账单/限额/FX、高端返现、BFF/搜索。
 扩展服务（贷款/风险/运营）需先 `--profile extended up -d`，按 `README.md` 页面逐项验证。
 
 手工验证命令见 `README.md` §4。
@@ -112,7 +112,7 @@ DB_HOST=localhost DB_NAME=carddemo_account mvn -f services/account-service/pom.x
 **业务界面（推荐）**：http://localhost:8090/
 - 登录账号已预填：`ADMIN001 / admin123`（管理员）、`USER0001 / user1234`（普通用户）。
 - 功能：账户视图、信用卡查询/维护、交易查询/录入、账单支付、交易报表、授权管理、
-  总账/对账/EOD、支付/账单、限额、汇率、客户 360、贷款、风险、运营、用户管理（管理员）。
+  总账/对账/EOD、支付/账单、限额、汇率、高端返现、贷款、风险、运营、用户管理（管理员）。
 - 所有 `/api/**` 由 web-ui 同源代理到对应微服务（浏览器无 CORS）。
 
 **API 控制台（Swagger UI）**：每个微服务的根路径重定向到自己的 Swagger UI。
@@ -131,6 +131,7 @@ DB_HOST=localhost DB_NAME=carddemo_account mvn -f services/account-service/pom.x
 | billing | http://localhost:8092/ | http://localhost:8092/v3/api-docs |
 | limit | http://localhost:8093/ | http://localhost:8093/v3/api-docs |
 | fx | http://localhost:8094/ | http://localhost:8094/v3/api-docs |
+| marketing | http://localhost:8087/ | http://localhost:8087/v3/api-docs |
 | loan | http://localhost:8095/ | http://localhost:8095/v3/api-docs |
 | fraud | http://localhost:8096/ | http://localhost:8096/v3/api-docs |
 | aml | http://localhost:8097/ | http://localhost:8097/v3/api-docs |
@@ -171,7 +172,7 @@ Compose 增加 `ports: ["5005:5005"]`，IDE 以 Remote JVM Debug 连接。
 | 入账返回 `103` 拒付 | 账户到期日早于交易原始日期 | 种子账户 1–5、7 的到期日已过，用账户 6（2027-03-09）或 8（2028-09-30）演示 |
 | 授权返回 `4100` | 可用额度 = 额度 − 当前欠款 − 待授权占用 | 属预期；账户 1 可用额度为 80.00 |
 | 交易号重复 | 入账 `transactionId` 已存在 | 入账按幂等处理（计入 posted + duplicates），换一个新交易号可验证新记账 |
-| 容器内存不足 | 默认 16 容器（15 JVM + PG）；extended 共 28 容器 | 默认 ≥10GB；全开 ≥16GB。8.3GB 实测：默认 16 稳定，扩展建议每批 ≤6 个、验证后停止 |
+| 容器内存不足 | 默认 17 容器（16 JVM + PG）；extended 共 29 容器 | 默认 ≥10GB；全开 ≥16GB。8.3GB 实测：默认 17 稳定，扩展建议每批 ≤6 个、验证后停止 |
 | 服务启动报 `too many clients already` | 服务数 × Hikari 10 > PostgreSQL 默认 100 | Compose 已设置 `max_connections=300`；如自定义 PG，请同步调大 |
 
 ## 6. 数据重置与重建
@@ -195,10 +196,10 @@ docker compose up -d --build
 
 | 项 | 结果 |
 |---|---|
-| `mvn test`（27 模块） | 762 用例全绿 |
+| `mvn test`（28 模块） | 816 用例全绿 |
 | `mvn verify` | JaCoCo 报告；ArchUnit 2 条规则通过 |
-| `docker compose up -d --build` | 16 个默认容器启动，15 个服务 health=UP |
-| `docker compose --profile extended up -d` | 追加 12 个扩展服务（总 28 容器） |
+| `docker compose up -d --build` | 17 个默认容器启动，16 个服务 health=UP |
+| `docker compose --profile extended up -d` | 追加 12 个扩展服务（总 29 容器） |
 | 冒烟：登录/账户/客户/卡 | 通过 |
 | 冒烟：入账（正常 + 超限 102） | 通过 |
 | 冒烟：授权（批准 50 / 超额 4100 / 汇总占用） | 通过 |
@@ -213,8 +214,9 @@ docker compose up -d --build
 | 扩展：欺诈评分/警报、AML 筛查、争议、催收 | 通过 |
 | 扩展：报表、通知、文档、工作流、审计、参考数据 | 通过 |
 | 扩展：BFF 客户 360 与统一搜索 | 通过 |
+| 高端返现：报名→消费 1000→返现 30→账户冲减→幂等 | 通过 |
 | P6：k6 脚本、混沌脚本、JaCoCo、ArchUnit | 已交付/通过 |
-| Swagger UI（26 个服务根路径 302 → `/swagger-ui/index.html`，HTTP 200） | 通过 |
+| Swagger UI（27 个服务根路径 302 → `/swagger-ui/index.html`，HTTP 200） | 通过 |
 | Web 界面（8090 首页 200、静态资源 MIME 正确、同源代理登录/查询/404） | 通过 |
 | 对账/EOD 页面语法与代理路由（`node --check`、`/api/v1/reconciliation-runs`） | 通过 |
 | 支付/账单/限额/FX 页面语法与代理路由（`node --check`、四组前缀） | 通过 |
