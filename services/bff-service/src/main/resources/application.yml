@@ -1,0 +1,47 @@
+server:
+  port: ${SERVER_PORT:8107}
+  shutdown: graceful
+
+spring:
+  application:
+    name: bff-service
+
+client:
+  connect-timeout: 2s
+  read-timeout: 2s
+  account-service:
+    base-url: ${ACCOUNT_SERVICE_URL:http://localhost:8084}
+  card-service:
+    base-url: ${CARD_SERVICE_URL:http://localhost:8083}
+  customer-service:
+    base-url: ${CUSTOMER_SERVICE_URL:http://localhost:8082}
+  transaction-service:
+    base-url: ${TRANSACTION_SERVICE_URL:http://localhost:8085}
+  marketing-service:
+    base-url: ${MARKETING_SERVICE_URL:http://localhost:8087}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    display-request-duration: true
+    try-it-out-enabled: true
+  default-produces-media-type: application/json
+
+logging:
+  level:
+    com.carddemo: INFO

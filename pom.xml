@@ -24,6 +24,26 @@
         <module>services/card-service</module>
         <module>services/account-service</module>
         <module>services/transaction-service</module>
+        <module>services/ledger-service</module>
+        <module>services/reconciliation-service</module>
+        <module>services/payment-service</module>
+        <module>services/billing-service</module>
+        <module>services/limit-service</module>
+        <module>services/fx-service</module>
+        <module>services/loan-service</module>
+        <module>services/fraud-service</module>
+        <module>services/aml-service</module>
+        <module>services/dispute-service</module>
+        <module>services/collections-service</module>
+        <module>services/batch-service</module>
+        <module>services/reporting-service</module>
+        <module>services/notification-service</module>
+        <module>services/document-service</module>
+        <module>services/workflow-service</module>
+        <module>services/audit-service</module>
+        <module>services/reference-data-service</module>
+        <module>services/bff-service</module>
+        <module>services/search-service</module>
         <module>services/authorization-service</module>
         <module>services/marketing-service</module>
         <module>services/web-ui</module>
@@ -34,6 +54,7 @@
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <springdoc.version>2.6.0</springdoc.version>
+        <jacoco.version>0.8.12</jacoco.version>
     </properties>
 
     <dependencyManagement>
@@ -60,5 +81,26 @@
                 </plugin>
             </plugins>
         </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
     </build>
 </project>

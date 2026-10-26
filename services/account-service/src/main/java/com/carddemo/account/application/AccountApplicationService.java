@@ -1,9 +1,12 @@
 package com.carddemo.account.application;
 
+import com.carddemo.account.domain.exception.BusinessRuleException;
 import com.carddemo.account.domain.exception.NotFoundException;
 import com.carddemo.account.domain.model.Account;
 import com.carddemo.account.domain.model.AccountDetails;
+import com.carddemo.account.domain.model.AccountProduct;
 import com.carddemo.account.domain.model.RewardCredit;
+import com.carddemo.account.domain.repository.AccountProductRepository;
 import com.carddemo.account.domain.repository.AccountRepository;
 import com.carddemo.account.domain.repository.RewardCreditRepository;
 import org.springframework.stereotype.Service;
@@ -23,10 +26,13 @@ public class AccountApplicationService {
 
     private final AccountRepository accounts;
     private final RewardCreditRepository rewardCredits;
+    private final AccountProductRepository products;
 
-    public AccountApplicationService(AccountRepository accounts, RewardCreditRepository rewardCredits) {
+    public AccountApplicationService(AccountRepository accounts, RewardCreditRepository rewardCredits,
+                                     AccountProductRepository products) {
         this.accounts = accounts;
         this.rewardCredits = rewardCredits;
+        this.products = products;
     }
 
     @Transactional(readOnly = true)
@@ -43,6 +49,23 @@ public class AccountApplicationService {
 
     public Account update(String accountId, AccountDetails details) {
         Account account = getById(accountId);
+        AccountProduct product = products.findByProductCode(account.getProductCode())
+                .orElseThrow(() -> new NotFoundException("PRODUCT_NOT_FOUND",
+                        "Account product " + account.getProductCode() + " not found"));
+        if (!product.isActive()) {
+            throw new BusinessRuleException("PRODUCT_INACTIVE",
+                    "Account product " + product.getProductCode() + " is inactive.");
+        }
+        if (details.creditLimit() != null
+                && details.creditLimit().compareTo(product.getMaxCreditLimit()) > 0) {
+            throw new BusinessRuleException("CREDIT_LIMIT_EXCEEDS_PRODUCT_MAX",
+                    "Credit limit exceeds product maximum " + product.getMaxCreditLimit() + ".");
+        }
+        if (details.cashCreditLimit() != null
+                && details.cashCreditLimit().compareTo(product.getMaxCashLimit()) > 0) {
+            throw new BusinessRuleException("CASH_LIMIT_EXCEEDS_PRODUCT_MAX",
+                    "Cash credit limit exceeds product maximum " + product.getMaxCashLimit() + ".");
+        }
         account.applyDetails(details);
         return accounts.saveAccount(account);
     }

@@ -4,6 +4,7 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: carddemo-postgres
+    command: ["postgres", "-c", "max_connections=300"]
     environment:
       POSTGRES_USER: carddemo
       POSTGRES_PASSWORD: carddemo
@@ -103,6 +104,8 @@ services:
       CARD_SERVICE_URL: http://card-service:8083
       ACCOUNT_SERVICE_URL: http://account-service:8084
       MARKETING_SERVICE_URL: http://marketing-service:8087
+      LEDGER_SERVICE_URL: http://ledger-service:8088
+      LEDGER_SYNC_ENABLED: "true"
     ports:
       - "8085:8085"
     depends_on:
@@ -113,6 +116,394 @@ services:
       account-service:
         condition: service_started
       marketing-service:
+        condition: service_started
+      ledger-service:
+        condition: service_started
+
+  ledger-service:
+    build:
+      context: ./services/ledger-service
+    container_name: carddemo-ledger
+    environment:
+      SERVER_PORT: 8088
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: carddemo_ledger
+      DB_USER: carddemo
+      DB_PASSWORD: carddemo
+    ports:
+      - "8088:8088"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  reconciliation-service:
+    build:
+      context: ./services/reconciliation-service
+    container_name: carddemo-reconciliation
+    environment:
+      SERVER_PORT: 8089
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: carddemo_reconciliation
+      DB_USER: carddemo
+      DB_PASSWORD: carddemo
+      TRANSACTION_SERVICE_URL: http://transaction-service:8085
+      LEDGER_SERVICE_URL: http://ledger-service:8088
+    ports:
+      - "8089:8089"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      transaction-service:
+        condition: service_started
+      ledger-service:
+        condition: service_started
+
+  payment-service:
+    build:
+      context: ./services/payment-service
+    container_name: carddemo-payment
+    environment:
+      SERVER_PORT: 8091
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: carddemo_payment
+      DB_USER: carddemo
+      DB_PASSWORD: carddemo
+      ACCOUNT_SERVICE_URL: http://account-service:8084
+      TRANSACTION_SERVICE_URL: http://transaction-service:8085
+    ports:
+      - "8091:8091"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      account-service:
+        condition: service_started
+      transaction-service:
+        condition: service_started
+
+  billing-service:
+    build:
+      context: ./services/billing-service
+    container_name: carddemo-billing
+    environment:
+      SERVER_PORT: 8092
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: carddemo_billing
+      DB_USER: carddemo
+      DB_PASSWORD: carddemo
+      ACCOUNT_SERVICE_URL: http://account-service:8084
+    ports:
+      - "8092:8092"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      account-service:
+        condition: service_started
+
+  limit-service:
+    build:
+      context: ./services/limit-service
+    container_name: carddemo-limit
+    environment:
+      SERVER_PORT: 8093
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: carddemo_limit
+      DB_USER: carddemo
+      DB_PASSWORD: carddemo
+    ports:
+      - "8093:8093"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  fx-service:
+    build:
+      context: ./services/fx-service
+    container_name: carddemo-fx
+    environment:
+      SERVER_PORT: 8094
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: carddemo_fx
+      DB_USER: carddemo
+      DB_PASSWORD: carddemo
+    ports:
+      - "8094:8094"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  loan-service:
+    profiles: ["extended"]
+    build:
+      context: ./services/loan-service
+    container_name: carddemo-loan
+    environment:
+      SERVER_PORT: 8095
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: carddemo_loan
+      DB_USER: carddemo
+      DB_PASSWORD: carddemo
+    ports:
+      - "8095:8095"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  fraud-service:
+    profiles: ["extended"]
+    build:
+      context: ./services/fraud-service
+    container_name: carddemo-fraud
+    environment:
+      SERVER_PORT: 8096
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: carddemo_fraud
+      DB_USER: carddemo
+      DB_PASSWORD: carddemo
+    ports:
+      - "8096:8096"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  aml-service:
+    profiles: ["extended"]
+    build:
+      context: ./services/aml-service
+    container_name: carddemo-aml
+    environment:
+      SERVER_PORT: 8097
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: carddemo_aml
+      DB_USER: carddemo
+      DB_PASSWORD: carddemo
+    ports:
+      - "8097:8097"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  dispute-service:
+    profiles: ["extended"]
+    build:
+      context: ./services/dispute-service
+    container_name: carddemo-dispute
+    environment:
+      SERVER_PORT: 8098
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: carddemo_dispute
+      DB_USER: carddemo
+      DB_PASSWORD: carddemo
+    ports:
+      - "8098:8098"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  collections-service:
+    profiles: ["extended"]
+    build:
+      context: ./services/collections-service
+    container_name: carddemo-collections
+    environment:
+      SERVER_PORT: 8099
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: carddemo_collections
+      DB_USER: carddemo
+      DB_PASSWORD: carddemo
+    ports:
+      - "8099:8099"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  batch-service:
+    profiles: ["extended"]
+    build:
+      context: ./services/batch-service
+    container_name: carddemo-batch
+    environment:
+      SERVER_PORT: 8100
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: carddemo_batch
+      DB_USER: carddemo
+      DB_PASSWORD: carddemo
+      TRANSACTION_SERVICE_URL: http://transaction-service:8085
+      RECONCILIATION_SERVICE_URL: http://reconciliation-service:8089
+    ports:
+      - "8100:8100"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      transaction-service:
+        condition: service_started
+      reconciliation-service:
+        condition: service_started
+
+  reporting-service:
+    profiles: ["extended"]
+    build:
+      context: ./services/reporting-service
+    container_name: carddemo-reporting
+    environment:
+      SERVER_PORT: 8101
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: carddemo_reporting
+      DB_USER: carddemo
+      DB_PASSWORD: carddemo
+      TRANSACTION_SERVICE_URL: http://transaction-service:8085
+      LEDGER_SERVICE_URL: http://ledger-service:8088
+    ports:
+      - "8101:8101"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      transaction-service:
+        condition: service_started
+      ledger-service:
+        condition: service_started
+
+  notification-service:
+    profiles: ["extended"]
+    build:
+      context: ./services/notification-service
+    container_name: carddemo-notification
+    environment:
+      SERVER_PORT: 8102
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: carddemo_notification
+      DB_USER: carddemo
+      DB_PASSWORD: carddemo
+    ports:
+      - "8102:8102"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  document-service:
+    profiles: ["extended"]
+    build:
+      context: ./services/document-service
+    container_name: carddemo-document
+    environment:
+      SERVER_PORT: 8103
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: carddemo_document
+      DB_USER: carddemo
+      DB_PASSWORD: carddemo
+    ports:
+      - "8103:8103"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  workflow-service:
+    profiles: ["extended"]
+    build:
+      context: ./services/workflow-service
+    container_name: carddemo-workflow
+    environment:
+      SERVER_PORT: 8104
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: carddemo_workflow
+      DB_USER: carddemo
+      DB_PASSWORD: carddemo
+    ports:
+      - "8104:8104"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  audit-service:
+    profiles: ["extended"]
+    build:
+      context: ./services/audit-service
+    container_name: carddemo-audit
+    environment:
+      SERVER_PORT: 8105
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: carddemo_audit
+      DB_USER: carddemo
+      DB_PASSWORD: carddemo
+    ports:
+      - "8105:8105"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  reference-data-service:
+    profiles: ["extended"]
+    build:
+      context: ./services/reference-data-service
+    container_name: carddemo-reference
+    environment:
+      SERVER_PORT: 8106
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: carddemo_reference
+      DB_USER: carddemo
+      DB_PASSWORD: carddemo
+    ports:
+      - "8106:8106"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  bff-service:
+    build:
+      context: ./services/bff-service
+    container_name: carddemo-bff
+    environment:
+      SERVER_PORT: 8107
+      ACCOUNT_SERVICE_URL: http://account-service:8084
+      CARD_SERVICE_URL: http://card-service:8083
+      CUSTOMER_SERVICE_URL: http://customer-service:8082
+      TRANSACTION_SERVICE_URL: http://transaction-service:8085
+      MARKETING_SERVICE_URL: http://marketing-service:8087
+    ports:
+      - "8107:8107"
+    depends_on:
+      account-service:
+        condition: service_started
+      card-service:
+        condition: service_started
+      customer-service:
+        condition: service_started
+      transaction-service:
+        condition: service_started
+      marketing-service:
+        condition: service_started
+
+  search-service:
+    build:
+      context: ./services/search-service
+    container_name: carddemo-search
+    environment:
+      SERVER_PORT: 8108
+      CUSTOMER_SERVICE_URL: http://customer-service:8082
+      TRANSACTION_SERVICE_URL: http://transaction-service:8085
+    ports:
+      - "8108:8108"
+    depends_on:
+      customer-service:
+        condition: service_started
+      transaction-service:
         condition: service_started
 
   authorization-service:
@@ -154,6 +545,26 @@ services:
       TRANSACTION_SERVICE_URL: http://transaction-service:8085
       AUTHORIZATION_SERVICE_URL: http://authorization-service:8086
       MARKETING_SERVICE_URL: http://marketing-service:8087
+      LEDGER_SERVICE_URL: http://ledger-service:8088
+      RECONCILIATION_SERVICE_URL: http://reconciliation-service:8089
+      PAYMENT_SERVICE_URL: http://payment-service:8091
+      BILLING_SERVICE_URL: http://billing-service:8092
+      LIMIT_SERVICE_URL: http://limit-service:8093
+      FX_SERVICE_URL: http://fx-service:8094
+      BFF_SERVICE_URL: http://bff-service:8107
+      SEARCH_SERVICE_URL: http://search-service:8108
+      LOAN_SERVICE_URL: http://loan-service:8095
+      FRAUD_SERVICE_URL: http://fraud-service:8096
+      AML_SERVICE_URL: http://aml-service:8097
+      DISPUTE_SERVICE_URL: http://dispute-service:8098
+      COLLECTIONS_SERVICE_URL: http://collections-service:8099
+      BATCH_SERVICE_URL: http://batch-service:8100
+      REPORTING_SERVICE_URL: http://reporting-service:8101
+      NOTIFICATION_SERVICE_URL: http://notification-service:8102
+      DOCUMENT_SERVICE_URL: http://document-service:8103
+      WORKFLOW_SERVICE_URL: http://workflow-service:8104
+      AUDIT_SERVICE_URL: http://audit-service:8105
+      REFERENCE_SERVICE_URL: http://reference-data-service:8106
     ports:
       - "8090:8080"
     depends_on:
@@ -170,6 +581,22 @@ services:
       authorization-service:
         condition: service_started
       marketing-service:
+        condition: service_started
+      ledger-service:
+        condition: service_started
+      reconciliation-service:
+        condition: service_started
+      payment-service:
+        condition: service_started
+      billing-service:
+        condition: service_started
+      limit-service:
+        condition: service_started
+      fx-service:
+        condition: service_started
+      bff-service:
+        condition: service_started
+      search-service:
         condition: service_started
 
   marketing-service:

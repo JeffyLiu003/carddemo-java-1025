@@ -24,6 +24,9 @@ public class Account {
     @Column(name = "account_id", length = 11, nullable = false, updatable = false)
     private String accountId;
 
+    @Column(name = "product_code", length = 20, nullable = false)
+    private String productCode;
+
     @Column(name = "active_status", length = 1, nullable = false)
     private String activeStatus;
 
@@ -66,7 +69,12 @@ public class Account {
     }
 
     public Account(String accountId, AccountDetails details) {
+        this(accountId, details, "CLASSIC");
+    }
+
+    public Account(String accountId, AccountDetails details, String productCode) {
         this.accountId = accountId;
+        this.productCode = requireProductCode(productCode);
         applyDetails(details);
         this.version = 0;
     }
@@ -123,6 +131,32 @@ public class Account {
         currentBalance = currentBalance.subtract(amount);
     }
 
+    /**
+     * AH-03/AH-07：可用额度 = 额度 - 当前欠款 - 未过期冻结合计。
+     */
+    public BigDecimal availableCredit(BigDecimal activeHoldAmount) {
+        BigDecimal holds = activeHoldAmount == null ? ZERO : activeHoldAmount;
+        return creditLimit.subtract(currentBalance).subtract(holds);
+    }
+
+    /**
+     * AH-01/AH-03：冻结前校验账户状态与可用额度。
+     */
+    public void assertCanReserve(BigDecimal amount, BigDecimal activeHoldAmount) {
+        if (!"Y".equals(activeStatus)) {
+            throw new BusinessRuleException("ACCOUNT_INACTIVE",
+                    "Account " + accountId + " is not active.");
+        }
+        if (amount == null || amount.signum() <= 0) {
+            throw new BusinessRuleException("INVALID_HOLD_AMOUNT",
+                    "Hold amount must be greater than zero.");
+        }
+        if (availableCredit(activeHoldAmount).compareTo(amount) < 0) {
+            throw new BusinessRuleException("INSUFFICIENT_AVAILABLE_CREDIT",
+                    "Insufficient available credit for account " + accountId + ".");
+        }
+    }
+
     public boolean matches(AccountDetails details) {
         return activeStatus.equals(details.activeStatus())
                 && currentBalance.compareTo(details.currentBalance()) == 0
@@ -173,6 +207,13 @@ public class Account {
         }
     }
 
+    private static String requireProductCode(String value) {
+        if (value == null || value.isBlank()) {
+            throw new BusinessRuleException("MISSING_PRODUCT_CODE", "Product code must be supplied.");
+        }
+        return value;
+    }
+
     private static void requireDate(LocalDate value, String field) {
         if (value == null) {
             throw new BusinessRuleException("MISSING_DATE", field + " must be supplied.");
@@ -184,6 +225,10 @@ public class Account {
 
     public String getAccountId() {
         return accountId;
+    }
+
+    public String getProductCode() {
+        return productCode;
     }
 
     public String getActiveStatus() {

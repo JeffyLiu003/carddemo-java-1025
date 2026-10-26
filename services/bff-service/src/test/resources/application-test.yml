@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: bff-service
+
+client:
+  connect-timeout: 2s
+  read-timeout: 2s
+  account-service:
+    base-url: http://localhost:8084
+  card-service:
+    base-url: http://localhost:8083
+  customer-service:
+    base-url: http://localhost:8082
+  transaction-service:
+    base-url: http://localhost:8085
+  marketing-service:
+    base-url: http://localhost:8087

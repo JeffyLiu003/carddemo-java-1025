@@ -44,7 +44,27 @@ public class ApiProxyController {
             @Value("${proxy.account-service-url}") String accountServiceUrl,
             @Value("${proxy.transaction-service-url}") String transactionServiceUrl,
             @Value("${proxy.authorization-service-url}") String authorizationServiceUrl,
-            @Value("${proxy.marketing-service-url}") String marketingServiceUrl) {
+            @Value("${proxy.marketing-service-url}") String marketingServiceUrl,
+            @Value("${proxy.ledger-service-url}") String ledgerServiceUrl,
+            @Value("${proxy.reconciliation-service-url}") String reconciliationServiceUrl,
+            @Value("${proxy.payment-service-url}") String paymentServiceUrl,
+            @Value("${proxy.billing-service-url}") String billingServiceUrl,
+            @Value("${proxy.limit-service-url}") String limitServiceUrl,
+            @Value("${proxy.fx-service-url}") String fxServiceUrl,
+            @Value("${proxy.bff-service-url}") String bffServiceUrl,
+            @Value("${proxy.search-service-url}") String searchServiceUrl,
+            @Value("${proxy.loan-service-url}") String loanServiceUrl,
+            @Value("${proxy.fraud-service-url}") String fraudServiceUrl,
+            @Value("${proxy.aml-service-url}") String amlServiceUrl,
+            @Value("${proxy.dispute-service-url}") String disputeServiceUrl,
+            @Value("${proxy.collections-service-url}") String collectionsServiceUrl,
+            @Value("${proxy.batch-service-url}") String batchServiceUrl,
+            @Value("${proxy.reporting-service-url}") String reportingServiceUrl,
+            @Value("${proxy.notification-service-url}") String notificationServiceUrl,
+            @Value("${proxy.document-service-url}") String documentServiceUrl,
+            @Value("${proxy.workflow-service-url}") String workflowServiceUrl,
+            @Value("${proxy.audit-service-url}") String auditServiceUrl,
+            @Value("${proxy.reference-service-url}") String referenceServiceUrl) {
         routes.put("/api/v1/auth", iamServiceUrl);
         routes.put("/api/v1/users", iamServiceUrl);
         routes.put("/api/v1/customers", customerServiceUrl);
@@ -54,9 +74,12 @@ public class ApiProxyController {
         routes.put("/api/v1/postings", transactionServiceUrl);
         routes.put("/api/v1/bill-payments", transactionServiceUrl);
         routes.put("/api/v1/interest-runs", transactionServiceUrl);
-        routes.put("/api/v1/reports", transactionServiceUrl);
+        // 交易报表（transaction-service）比 reporting 的 /api/v1/reports 更具体，必须先匹配
+        routes.put("/api/v1/reports/transactions", transactionServiceUrl);
         routes.put("/api/v1/transaction-types", transactionServiceUrl);
         routes.put("/api/v1/transaction-categories", transactionServiceUrl);
+        routes.put("/api/v1/posting-types", transactionServiceUrl);
+        routes.put("/api/v1/posting-batches", transactionServiceUrl);
         routes.put("/api/v1/authorizations", authorizationServiceUrl);
         routes.put("/api/v1/pending-authorizations", authorizationServiceUrl);
         routes.put("/api/v1/authorization-purges", authorizationServiceUrl);
@@ -65,6 +88,38 @@ public class ApiProxyController {
         routes.put("/api/v1/reward-evaluations", marketingServiceUrl);
         routes.put("/api/v1/rewards", marketingServiceUrl);
         routes.put("/api/v1/marketing", marketingServiceUrl);
+        routes.put("/api/v1/ledger-accounts", ledgerServiceUrl);
+        routes.put("/api/v1/journal-entries", ledgerServiceUrl);
+        routes.put("/api/v1/trial-balance", ledgerServiceUrl);
+        routes.put("/api/v1/accounting-periods", ledgerServiceUrl);
+        routes.put("/api/v1/reconciliation-runs", reconciliationServiceUrl);
+        routes.put("/api/v1/reconciliation-items", reconciliationServiceUrl);
+        routes.put("/api/v1/eod-runs", reconciliationServiceUrl);
+        routes.put("/api/v1/payment-orders", paymentServiceUrl);
+        routes.put("/api/v1/statements", billingServiceUrl);
+        routes.put("/api/v1/limits", limitServiceUrl);
+        routes.put("/api/v1/fx", fxServiceUrl);
+        routes.put("/api/v1/bff", bffServiceUrl);
+        routes.put("/api/v1/search", searchServiceUrl);
+        routes.put("/api/v1/loan-applications", loanServiceUrl);
+        routes.put("/api/v1/loans", loanServiceUrl);
+        routes.put("/api/v1/fraud-evaluations", fraudServiceUrl);
+        routes.put("/api/v1/fraud-alerts", fraudServiceUrl);
+        routes.put("/api/v1/screenings", amlServiceUrl);
+        routes.put("/api/v1/aml-alerts", amlServiceUrl);
+        routes.put("/api/v1/disputes", disputeServiceUrl);
+        routes.put("/api/v1/delinquency-cases", collectionsServiceUrl);
+        routes.put("/api/v1/jobs", batchServiceUrl);
+        routes.put("/api/v1/job-runs", batchServiceUrl);
+        routes.put("/api/v1/reports", reportingServiceUrl);
+        routes.put("/api/v1/report-runs", reportingServiceUrl);
+        routes.put("/api/v1/notification-templates", notificationServiceUrl);
+        routes.put("/api/v1/notifications", notificationServiceUrl);
+        routes.put("/api/v1/documents", documentServiceUrl);
+        routes.put("/api/v1/workflow-definitions", workflowServiceUrl);
+        routes.put("/api/v1/workflow-tasks", workflowServiceUrl);
+        routes.put("/api/v1/audit-events", auditServiceUrl);
+        routes.put("/api/v1/reference", referenceServiceUrl);
 
         this.restClient = RestClient.builder()
                 .requestFactory(requestFactory())

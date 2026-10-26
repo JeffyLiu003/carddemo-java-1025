@@ -83,6 +83,35 @@ class AccountTest {
     }
 
     @Test
+    void availableCreditSubtractsBalanceAndActiveHolds() {
+        Account account = account("100.00");
+
+        assertThat(account.availableCredit(new BigDecimal("50.00"))).isEqualByComparingTo("1850.00");
+        assertThat(account.availableCredit(null)).isEqualByComparingTo("1900.00");
+    }
+
+    @Test
+    void reserveRejectsAmountAboveAvailableCredit() {
+        Account account = account("1900.00");
+
+        assertThatThrownBy(() -> account.assertCanReserve(new BigDecimal("150.00"), BigDecimal.ZERO))
+                .isInstanceOf(BusinessRuleException.class)
+                .extracting("code").isEqualTo("INSUFFICIENT_AVAILABLE_CREDIT");
+    }
+
+    @Test
+    void reserveRejectsInactiveAccount() {
+        Account account = new Account("00000000007", new AccountDetails("N",
+                new BigDecimal("100.00"), new BigDecimal("2000.00"), new BigDecimal("1000.00"),
+                LocalDate.of(2020, 1, 1), LocalDate.of(2028, 1, 1), LocalDate.of(2028, 1, 1),
+                new BigDecimal("0.00"), new BigDecimal("0.00"), null, null));
+
+        assertThatThrownBy(() -> account.assertCanReserve(new BigDecimal("10.00"), BigDecimal.ZERO))
+                .isInstanceOf(BusinessRuleException.class)
+                .extracting("code").isEqualTo("ACCOUNT_INACTIVE");
+    }
+
+    @Test
     void updateRejectsStatusOutsideLegacyEnumeration() {
         Account account = account("100.00");
         AccountDetails invalid = new AccountDetails("X", new BigDecimal("1.00"), new BigDecimal("1.00"),

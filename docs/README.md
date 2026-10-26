@@ -15,14 +15,22 @@
 | 文档 | 内容 |
 |---|---|
 | [design/01-domain-analysis.md](design/01-domain-analysis.md) | 子域划分、聚合与不变量、领域服务/事件、语义差异 |
-| [design/02-bounded-contexts.md](design/02-bounded-contexts.md) | 6 个限界上下文的职责、边界、数据所有权 |
+| [design/02-bounded-contexts.md](design/02-bounded-contexts.md) | 27 个限界上下文的职责、边界、数据所有权 |
 | [design/03-service-decomposition.md](design/03-service-decomposition.md) | 服务拆分、调用矩阵、失败语义、部署与容量 |
 | [design/04-context-map.md](design/04-context-map.md) | 上下文映射图、集成契约、防腐层 |
 | [design/05-api-catalog.md](design/05-api-catalog.md) | 全部 REST 契约、种子数据契约、错误码总表 |
 | [design/06-traceability-matrix.md](design/06-traceability-matrix.md) | 遗留程序 → 服务 → 接口 → 规则 → 测试 |
 | [design/07-java-conventions.md](design/07-java-conventions.md) | 编码/分层/配置/测试统一基线 |
 | [design/08-marketing-capability.md](design/08-marketing-capability.md) | 营销能力：场景、领域模型、规则、前后台改造 |
-| [design/adr/README.md](design/adr/README.md) | 9 个架构决策记录（MADR） |
+| [design/09-scale-up-blueprint.md](design/09-scale-up-blueprint.md) | 规模化蓝图：现状基线、目标服务地图、七阶段路线图 |
+| [design/10-money-path-slice-a1.md](design/10-money-path-slice-a1.md) | 钱路径切片 A1：账户产品化、冻结、过账、总账与对账设计 |
+| [design/11-money-path-slice-a2.md](design/11-money-path-slice-a2.md) | 钱路径切片 A2：过账引擎、总账、试算平衡与前台 |
+| [design/12-reconciliation-and-eod.md](design/12-reconciliation-and-eod.md) | 钱路径切片 A1.4：对账、差异处理与 EOD |
+| [design/13-payments-billing-limits-fx.md](design/13-payments-billing-limits-fx.md) | P2：支付、账单、限额与 FX |
+| [design/14-risk-credit-collections.md](design/14-risk-credit-collections.md) | P3：信贷、欺诈、AML、争议、催收、批处理 |
+| [design/15-operations-support.md](design/15-operations-support.md) | P4：报表、通知、文档、工作流、审计、参考数据 |
+| [design/16-channel-and-quality.md](design/16-channel-and-quality.md) | P5/P6：BFF、搜索、门户、性能、混沌与安全 |
+| [design/adr/README.md](design/adr/README.md) | 12 个架构决策记录（MADR） |
 
 ## 3. 运维
 

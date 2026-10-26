@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:reconciliationdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+client:
+  transaction-service:
+    base-url: http://localhost:8085
+  ledger-service:
+    base-url: http://localhost:8088
+  connect-timeout: 1s
+  read-timeout: 1s
+
+logging:
+  level:
+    com.carddemo: INFO

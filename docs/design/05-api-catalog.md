@@ -7,7 +7,7 @@
 > 列表响应统一 `{"items": [...], "page": 0, "size": 10, "total": 42}`。
 > 错误响应统一 `{"code": "...", "message": "...", "details": [...]}`，HTTP 语义见规范 §4。
 
-## 0. 种子数据契约（6 个服务必须一致）
+## 0. 种子数据契约（初始 6 个服务必须一致）
 
 ### 客户（customer-service）
 
@@ -632,6 +632,163 @@
 
 `200` 返回账户；同一 `rewardId` 重复调用不重复入账；金额 ≤ 0 返回 `409 INVALID_CASHBACK_AMOUNT`。
 
+### 7.4 account-service 账户产品与资金冻结（A1.1）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/v1/account-products` | 产品列表（含额度上限、APR、月费、账单日） |
+| GET | `/api/v1/account-products/{productCode}` | 产品详情 |
+| GET | `/api/v1/accounts/{accountId}/credit-position` | 额度、余额、冻结、可用额度 |
+| GET | `/api/v1/accounts/{accountId}/holds?status=ACTIVE` | 冻结列表，`status` 可选 |
+| POST | `/api/v1/accounts/{accountId}/holds` | 创建冻结，`referenceId` 幂等 |
+| DELETE | `/api/v1/accounts/{accountId}/holds/{holdId}` | 释放冻结，重复释放幂等 |
+
+创建冻结请求：
+
+```json
+{"amount": 100.00, "referenceType": "AUTHORIZATION", "referenceId": "auth-20261026-0001", "expiresAt": "2026-10-26T12:00:00"}
+```
+
+可用额度 = `creditLimit - currentBalance - Σ(ACTIVE 且未过期的 hold)`。
+账户响应新增 `productCode`；账户更新时额度不得超过产品上限。
+
+### 7.5 transaction-service 过账引擎（A1.2）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/v1/posting-types` | 过账类型列表 |
+| GET | `/api/v1/posting-types/{typeCode}` | 类型详情 + 借贷规则 |
+| POST | `/api/v1/posting-batches` | 创建过账批次（201，`idempotencyKey` 幂等） |
+| GET | `/api/v1/posting-batches/{batchId}` | 批次详情（含 legs） |
+| GET | `/api/v1/posting-batches?page=&size=&accountId=&idempotencyKey=` | 分页查询 |
+| POST | `/api/v1/posting-batches/{batchId}/reversal` | 冲正，返回冲正批次 |
+
+```json
+{"idempotencyKey":"post-20261026-0001","typeCode":"CARD_PURCHASE",
+ "accountId":"00000000006","amount":25.00,"currency":"USD",
+ "description":"Purchase at Corner Grocery"}
+```
+
+类型：`CARD_PURCHASE`、`CASH_ADVANCE`、`FEE`、`INTEREST`（INCREASE）；`PAYMENT`、`REFUND`（DECREASE）；
+`ADJUSTMENT`（INCREASE）。批次生成 2 条 leg，借贷必须平衡；`reversal:<batchId>` 为冲正批次幂等键。
+
+### 7.6 ledger-service 总账（A1.3）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/v1/ledger-accounts` | 科目表 |
+| GET | `/api/v1/ledger-accounts/{code}` | 科目详情 |
+| POST | `/api/v1/journal-entries` | 记日记账（201，`(sourceType, sourceId)` 幂等） |
+| GET | `/api/v1/journal-entries/{entryId}` | 分录详情 |
+| GET | `/api/v1/journal-entries?page=&size=&sourceId=` | 分页查询 |
+| POST | `/api/v1/journal-entries/{entryId}/reversal` | 冲正（201） |
+| GET | `/api/v1/trial-balance?period=YYYY-MM` | 试算平衡 |
+| GET | `/api/v1/accounting-periods` | 期间列表 |
+| POST | `/api/v1/accounting-periods/{period}/close` | 关账 |
+
+```json
+{"sourceType":"POSTING_BATCH","sourceId":"b-1","description":"Card purchase",
+ "postedAt":"2026-10-26T04:00:00","currency":"USD",
+ "lines":[{"accountCode":"1100","direction":"DR","amount":25.00},
+          {"accountCode":"2100","direction":"CR","amount":25.00}]}
+```
+
+种子科目：1000/1100/2000/2100/2200/4000/4100/5000/9000；种子期间：2026-09 CLOSED、2026-10/11 OPEN。
+
+### 7.7 reconciliation-service 对账与 EOD（A1.4）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/v1/reconciliation-runs` | 按 `businessDate` 执行对账（201） |
+| GET | `/api/v1/reconciliation-runs/{runId}` | 运行详情 + items |
+| GET | `/api/v1/reconciliation-runs?page=&size=` | 运行历史 |
+| GET | `/api/v1/reconciliation-runs/{runId}/items` | 差异明细 |
+| POST | `/api/v1/reconciliation-items/{itemId}/resolve` | 登记差异处理说明 |
+| POST | `/api/v1/eod-runs` | 执行 EOD（当前步骤：对账，201） |
+| GET | `/api/v1/eod-runs/{runId}` | EOD 详情 |
+| GET | `/api/v1/eod-runs?page=&size=` | EOD 历史 |
+
+```json
+{"businessDate":"2026-10-26"}
+```
+
+匹配键：`posting_batch.batch_id` ↔ `journal_entry.source_id`（`sourceType=POSTING_BATCH`）；
+差异状态：`MATCH`、`MISSING_JOURNAL`、`MISSING_BATCH`、`AMOUNT_MISMATCH`、`UNBALANCED`。
+
+### 7.8 payment-service 支付（P2）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/v1/payment-orders` | 受理支付（201，`idempotencyKey` 幂等） |
+| GET | `/api/v1/payment-orders/{paymentId}` | 详情 |
+| GET | `/api/v1/payment-orders?page=&size=&status=&accountId=` | 分页 |
+| POST | `/api/v1/payment-orders/{paymentId}/accept` | 接受 |
+| POST | `/api/v1/payment-orders/{paymentId}/settle` | 清算（过账） |
+| POST | `/api/v1/payment-orders/{paymentId}/return` | 退汇 |
+
+```json
+{"idempotencyKey":"pay-20261026-0001","debtorAccountId":"00000000006",
+ "creditorName":"Acme Utility","creditorAccountNumber":"1234567890123456",
+ "creditorBankCode":"BOFAUS3N","amount":120.00,"currency":"USD",
+ "paymentType":"ACH","reference":"INV-2026-10","description":"Utility bill"}
+```
+
+### 7.9 billing-service 账单（P2）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/v1/statements/generate` | 生成账单（201，账户+期间幂等） |
+| GET | `/api/v1/statements/{statementId}` | 详情 |
+| GET | `/api/v1/statements?accountId=&page=&size=` | 分页 |
+| POST | `/api/v1/statements/{statementId}/pay` | 全额支付 |
+
+```json
+{"accountId":"00000000001","period":"2026-10"}
+```
+
+### 7.10 limit-service 限额（P2）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/v1/limits` | 创建限额（201） |
+| GET | `/api/v1/limits?scopeType=&scopeId=&page=&size=` | 列表 |
+| GET | `/api/v1/limits/{limitId}` | 详情 |
+| PUT | `/api/v1/limits/{limitId}` | 调整额度 |
+| POST | `/api/v1/limits/{limitId}/usage` | 占用 |
+| POST | `/api/v1/limits/{limitId}/release` | 释放 |
+| GET | `/api/v1/limits/check?scopeType=&scopeId=&limitType=&currency=&amount=` | 可用性检查 |
+
+### 7.11 fx-service 汇率（P2）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/v1/fx/rates` | 汇率列表 |
+| POST | `/api/v1/fx/rates` | 维护汇率（upsert） |
+| POST | `/api/v1/fx/quotes` | 报价（201，5 分钟有效） |
+| POST | `/api/v1/fx/quotes/{quoteId}/execute` | 执行换汇（201） |
+| GET | `/api/v1/fx/conversions` | 换汇记录 |
+
+### 7.12 P3/P4/P5 扩展 API（按前缀）
+
+> 完整字段以各服务 `/v3/api-docs` 为准；下表给出契约入口与关键动作。
+
+| 服务 | 路径前缀 | 关键端点 |
+|---|---|---|
+| loan | `/api/v1/loan-applications`、`/api/v1/loans` | 申请、approve/reject、disburse、schedule、repayments |
+| fraud | `/api/v1/fraud-evaluations`、`/api/v1/fraud-alerts` | 评分、警报、confirm/dismiss |
+| aml | `/api/v1/screenings`、`/api/v1/aml-alerts` | 筛查、警报、clear/escalate |
+| dispute | `/api/v1/disputes` | 开案、review、provisional-credit、chargeback、resolve |
+| collections | `/api/v1/delinquency-cases` | 建案、recalculate、promise-to-pay、resolve |
+| batch | `/api/v1/jobs`、`/api/v1/job-runs` | 作业定义、执行、历史 |
+| reporting | `/api/v1/reports`、`/api/v1/report-runs` | 定义、生成、结果行 |
+| notification | `/api/v1/notification-templates`、`/api/v1/notifications` | 模板、创建、发送 |
+| document | `/api/v1/documents` | 上传、元数据、content、archive、delete |
+| workflow | `/api/v1/workflow-definitions`、`/api/v1/workflow-tasks` | 定义、建任务、approve/reject |
+| audit | `/api/v1/audit-events` | 追加、详情、检索 |
+| reference | `/api/v1/reference` | 按 domain 列表、详情、增删改 |
+| bff | `/api/v1/bff` | `GET /customer-overview?accountId=` |
+| search | `/api/v1/search` | `GET ?q=&type=&limit=` |
+
 ## 8. 错误码总表
 
 | code | HTTP | 归属 | 含义 |
@@ -648,6 +805,76 @@
 | CARD_ALREADY_EXISTS | 409 | card | 卡号重复 |
 | ACCOUNT_CUSTOMER_MISMATCH | 409 | card | 卡与账户/客户归属不一致 |
 | ACCOUNT_NOT_FOUND | 404 | account | 账户不存在 |
+| PRODUCT_NOT_FOUND | 404 | account | 账户产品不存在 |
+| PRODUCT_INACTIVE | 409 | account | 产品已停售 |
+| CREDIT_LIMIT_EXCEEDS_PRODUCT_MAX | 409 | account | 额度超过产品上限 |
+| CASH_LIMIT_EXCEEDS_PRODUCT_MAX | 409 | account | 取现额度超过产品上限 |
+| MISSING_PRODUCT_CODE | 409 | account | 账户缺少产品编码 |
+| ACCOUNT_INACTIVE | 409 | account | 账户状态非 Y，不能冻结 |
+| INVALID_HOLD_AMOUNT | 409 | account | 冻结金额 ≤ 0 |
+| INVALID_HOLD_REFERENCE | 409 | account | 冻结来源类型/幂等键为空 |
+| INVALID_HOLD_EXPIRY | 409 | account | 冻结过期时间不在将来 |
+| INSUFFICIENT_AVAILABLE_CREDIT | 409 | account | 可用额度不足 |
+| HOLD_NOT_FOUND | 404 | account | 冻结记录不存在 |
+| HOLD_NOT_RELEASABLE | 409 | account | 当前状态不可释放 |
+| HOLD_REFERENCE_CONFLICT | 409 | account | 幂等键已用于不同金额 |
+| HOLD_REFERENCE_REUSED | 409 | account | 幂等键已用于已关闭记录 |
+| POSTING_TYPE_NOT_FOUND | 404 | transaction | 过账类型不存在 |
+| POSTING_TYPE_INACTIVE | 409 | transaction | 过账类型停用 |
+| INVALID_POSTING_AMOUNT | 409 | transaction | 过账金额 ≤ 0 或精度超限 |
+| IDEMPOTENCY_KEY_REQUIRED | 400 | transaction | 缺少幂等键 |
+| IDEMPOTENCY_CONFLICT | 409 | transaction | 幂等键已用于不同请求 |
+| POSTING_BATCH_NOT_FOUND | 404 | transaction | 过账批次不存在 |
+| UNBALANCED_POSTING | 409 | transaction | 借贷分录不平衡 |
+| REVERSAL_NOT_ALLOWED | 409 | transaction | 冲正批次不可再冲正 |
+| JOURNAL_ENTRY_NOT_FOUND | 404 | ledger | 日记账分录不存在 |
+| JOURNAL_SOURCE_CONFLICT | 409 | ledger | 业务键已用于不同内容 |
+| UNBALANCED_JOURNAL | 409 | ledger | 日记账借贷不平衡 |
+| INVALID_JOURNAL_AMOUNT | 409 | ledger | 分录金额 ≤ 0 |
+| INVALID_JOURNAL_ENTRY | 409 | ledger | 分录来源/科目缺失 |
+| DUPLICATE_LINE_NO | 409 | ledger | 分录行号重复 |
+| JOURNAL_ALREADY_REVERSED | 409 | ledger | 分录已冲正 |
+| LEDGER_ACCOUNT_NOT_FOUND | 404 | ledger | 总账科目不存在 |
+| LEDGER_ACCOUNT_INACTIVE | 409 | ledger | 总账科目停用 |
+| PERIOD_NOT_FOUND | 404 | ledger | 会计期间不存在 |
+| PERIOD_CLOSED | 409 | ledger | 会计期间已关账 |
+| PERIOD_ALREADY_CLOSED | 409 | ledger | 重复关账 |
+| RECONCILIATION_RUN_NOT_FOUND | 404 | reconciliation | 对账运行不存在 |
+| RECONCILIATION_ITEM_NOT_FOUND | 404 | reconciliation | 对账明细不存在 |
+| EOD_RUN_NOT_FOUND | 404 | reconciliation | EOD 运行不存在 |
+| PAYMENT_NOT_FOUND | 404 | payment | 支付单不存在 |
+| ACCOUNT_REQUIRED | 400 | payment | 缺少付款账户 |
+| ACCOUNT_INACTIVE | 409 | account/payment | 账户状态非 Y |
+| IDEMPOTENCY_KEY_REQUIRED | 400 | transaction/payment | 缺少幂等键 |
+| IDEMPOTENCY_CONFLICT | 409 | transaction/payment | 幂等键已用于不同请求 |
+| INVALID_PAYMENT_AMOUNT | 409 | payment | 支付金额非法 |
+| INVALID_PAYMENT_TYPE | 409 | payment | 支付类型非法 |
+| INVALID_PAYMENT_STATUS | 400 | payment | 状态筛选值非法 |
+| PAYMENT_NOT_SCREENED | 409 | payment | 支付单非 SCREENED |
+| PAYMENT_NOT_ACCEPTED | 409 | payment | 支付单非 ACCEPTED |
+| PAYMENT_NOT_RETURNABLE | 409 | payment | 支付单不可退汇 |
+| STATEMENT_NOT_FOUND | 404 | billing | 账单不存在 |
+| STATEMENT_ALREADY_EXISTS | 409 | billing | 并发生成同一账户+期间 |
+| INVALID_PERIOD | 400 | billing | 期间格式非法 |
+| PRODUCT_NOT_FOUND | 404 | account/billing | 产品不存在 |
+| LIMIT_NOT_FOUND | 404 | limit | 限额不存在 |
+| LIMIT_EXCEEDED | 409 | limit | 超出限额 |
+| LIMIT_ALREADY_DEFINED | 409 | limit | 限额已存在 |
+| LIMIT_INACTIVE | 409 | limit | 限额停用 |
+| LIMIT_BELOW_USED | 409 | limit | 调整额度低于已用 |
+| INVALID_LIMIT_AMOUNT | 409 | limit | 额度非法 |
+| INVALID_LIMIT_RELEASE | 409 | limit | 释放金额非法 |
+| INVALID_LIMIT_SCOPE | 400 | limit | 限额范围非法 |
+| INVALID_LIMIT_TYPE | 400 | limit | 限额类型非法 |
+| RATE_NOT_FOUND | 404 | fx | 汇率不存在 |
+| RATE_CONFLICT | 409 | fx | 汇率并发冲突 |
+| RATE_INACTIVE | 409 | fx | 汇率停用 |
+| QUOTE_NOT_FOUND | 404 | fx | 报价不存在 |
+| QUOTE_EXPIRED | 409 | fx | 报价已过期 |
+| QUOTE_ALREADY_CONSUMED | 409 | fx | 报价已消费 |
+| INVALID_QUOTE_AMOUNT | 409 | fx | 报价金额非法 |
+| INVALID_RATE | 409 | fx | 汇率非法 |
+| SAME_CURRENCY | 409 | fx | 换入换出币种相同 |
 | NOTHING_TO_PAY | 409 | account/transaction | 无欠款，不能还款 |
 | PAYMENT_EXCEEDS_BALANCE | 409 | account | 还款金额超过余额 |
 | INVALID_PAYMENT_AMOUNT | 409 | account | 还款金额 ≤ 0 |

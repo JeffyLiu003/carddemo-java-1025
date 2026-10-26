@@ -7,6 +7,7 @@ import java.time.LocalDate;
 
 public record AccountResponse(
         String accountId,
+        String productCode,
         String activeStatus,
         BigDecimal currentBalance,
         BigDecimal creditLimit,
@@ -23,6 +24,7 @@ public record AccountResponse(
     public static AccountResponse from(Account account) {
         return new AccountResponse(
                 account.getAccountId(),
+                account.getProductCode(),
                 account.getActiveStatus(),
                 account.getCurrentBalance(),
                 account.getCreditLimit(),

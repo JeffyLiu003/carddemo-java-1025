@@ -12,6 +12,11 @@ public interface AccountRepository {
 
     Optional<Account> findByAccountId(String accountId);
 
+    /**
+     * AH-08：对账户加悲观锁，串行化同一账户的冻结/释放。
+     */
+    Optional<Account> lockByAccountId(String accountId);
+
     Account saveAccount(Account account);
 
     List<Account> findAllAccounts();

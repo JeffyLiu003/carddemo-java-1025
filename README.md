@@ -2,7 +2,7 @@
 
 把 AWS CardDemo（CICS/COBOL 信用卡核心演示系统）迁移为基于 **DDD 限界上下文**的 Java 微服务工程。
 本项目不是逐行翻译 COBOL，而是：先提取存量业务知识（L1–L5 五层模型 + 业务规则目录），
-再按领域边界划分 7 个微服务（6 个既有业务域 + 1 个新增营销支撑域），最后用 Spring Boot 3 落地，并提供面向业务人员的 Web 界面与
+再按领域边界划分 27 个微服务（6 个既有业务域 + 营销、总账、对账、支付、账单、限额、汇率、信贷、风险、运营、渠道），最后用 Spring Boot 3 落地，并提供面向业务人员的 Web 界面与
 Docker Compose 调试运行能力。
 
 ## 1. 架构总览
@@ -11,17 +11,28 @@ Docker Compose 调试运行能力。
 graph LR
     USER([业务人员]) --> WEB[web-ui :8090<br/>Web 界面 + 同源 API 代理]
     subgraph 核心域
-      TXN[transaction-service :8085<br/>交易/入账/利息/账单支付/报表]
+      TXN[transaction-service :8085<br/>交易/过账/利息/账单支付/报表]
+      LEDGER[ledger-service :8088<br/>科目/日记账/试算平衡/关账]
+      PAY[payment-service :8091<br/>支付受理/筛查/清算/退汇]
       AUTH[authorization-service :8086<br/>授权决策/待授权/欺诈]
-      ACCT[account-service :8084<br/>余额/额度/记账]
+      ACCT[account-service :8084<br/>产品/额度/余额/冻结]
       CARD[card-service :8083<br/>卡与卡-账户-客户映射]
     end
     subgraph 支撑/通用域
       CUST[customer-service :8082<br/>客户主数据]
       IAM[iam-service :8081<br/>登录/用户]
       MKT[marketing-service :8087<br/>活动/报名/返现/积分]
+      RECON[reconciliation-service :8089<br/>对账/差异处理/EOD]
+      BILL[billing-service :8092<br/>账单/利息/最低还款]
+      LIMIT[limit-service :8093<br/>限额/用量]
+      FX[fx-service :8094<br/>汇率/报价/换汇]
+      LENDING[loan-service :8095<br/>信贷/还款计划]
+      RISK[fraud :8096 / aml :8097<br/>dispute :8098 / collections :8099]
+      OPS[batch :8100 / reporting :8101<br/>notification :8102 / document :8103<br/>workflow :8104 / audit :8105<br/>reference-data :8106]
+      BFF[bff-service :8107<br/>客户 360 聚合]
+      SEARCH[search-service :8108<br/>统一搜索]
     end
-    DB[(PostgreSQL 16<br/>7 个独立 database)]
+    DB[(PostgreSQL 16<br/>25 个独立 database)]
 
     WEB -. /api/** 代理 .-> IAM
     WEB -.-> CUST
@@ -30,6 +41,14 @@ graph LR
     WEB -.-> TXN
     WEB -.-> AUTH
     WEB -.-> MKT
+    WEB -.-> LEDGER
+    WEB -.-> RECON
+    WEB -.-> PAY
+    WEB -.-> BILL
+    WEB -.-> LIMIT
+    WEB -.-> FX
+    WEB -.-> BFF
+    WEB -.-> SEARCH
     CARD --> TXN
     ACCT --> TXN
     CARD --> AUTH
@@ -37,8 +56,28 @@ graph LR
     CUST -.-> AUTH
     IAM -. token 契约（POC 未强制） .-> TXN
     TXN -. 入账后奖励评估 .-> MKT
+    TXN -. 过账后同步日记账 .-> LEDGER
+    RECON -. 读取批次/日记账 .-> TXN
+    RECON -. 读取日记账/试算平衡 .-> LEDGER
+    PAY -. 清算过账 .-> TXN
+    PAY -. 账户校验 .-> ACCT
+    BILL -. 账户/产品/还款 .-> ACCT
+    BFF -. 聚合 .-> ACCT
+    BFF -. 聚合 .-> CARD
+    BFF -. 聚合 .-> TXN
+    SEARCH -. 查询 .-> CUST
+    SEARCH -. 查询 .-> TXN
     MKT --> ACCT
     TXN --> DB
+    LEDGER --> DB
+    RECON --> DB
+    PAY --> DB
+    BILL --> DB
+    LIMIT --> DB
+    FX --> DB
+    LENDING --> DB
+    RISK --> DB
+    OPS --> DB
     AUTH --> DB
     ACCT --> DB
     CARD --> DB
@@ -53,8 +92,28 @@ graph LR
 | iam-service | 8081 | `carddemo_iam` | COSGN00C、COADM01C、COMEN01C、COUSR00C–03C |
 | customer-service | 8082 | `carddemo_customer` | CUSTDAT、CBCUS01C、COACTUPC（客户部分） |
 | card-service | 8083 | `carddemo_card` | CARDDAT、CCXREF、COCRDLIC/SLC/UPC |
-| account-service | 8084 | `carddemo_account` | ACCTDAT、COACTVWC、COACTUPC（账户部分）、CBTRN02C 账户段、CBACT04C 结算、COBIL00C 扣款 |
-| transaction-service | 8085 | `carddemo_transaction` | TRANSACT、DALYTRAN、TCATBALF、CBTRN01C/02C/03C、CBACT04C、COBIL00C、COTRN00C/01C/02C、CORPT00C、COTRTLIC |
+| account-service | 8084 | `carddemo_account` | ACCTDAT、COACTVWC、COACTUPC（账户部分）、CBTRN02C 账户段、CBACT04C 结算、COBIL00C 扣款；新增产品目录、资金冻结与可用额度 |
+| transaction-service | 8085 | `carddemo_transaction` | TRANSACT、DALYTRAN、TCATBALF、CBTRN01C/02C/03C、CBACT04C、COBIL00C、COTRN00C/01C/02C、CORPT00C、COTRTLIC；新增过账引擎（类型/规则/批次/冲正） |
+| ledger-service | 8088 | `carddemo_ledger` | **新增能力**（存量无总账）：科目表、复式日记账、试算平衡、期间关账 |
+| reconciliation-service | 8089 | `carddemo_reconciliation` | **新增能力**：过账批次 ↔ 总账日记账对账、差异处理、EOD 作业入口 |
+| payment-service | 8091 | `carddemo_payment` | **新增能力**：支付指令受理、筛查、清算（过账）、退汇 |
+| billing-service | 8092 | `carddemo_billing` | **新增能力**：账单生成、利息/最低还款、账单支付 |
+| limit-service | 8093 | `carddemo_limit` | **新增能力**：客户/账户/渠道限额、用量与校验 |
+| fx-service | 8094 | `carddemo_fx` | **新增能力**：汇率维护、报价、换汇记录 |
+| loan-service | 8095 | `carddemo_loan` | **新增能力**：贷款申请、审批、放款、等额本息计划、还款 |
+| fraud-service | 8096 | `carddemo_fraud` | **新增能力**：欺诈规则评分、警报与处置 |
+| aml-service | 8097 | `carddemo_aml` | **新增能力**：制裁/名单筛查、AML 警报 |
+| dispute-service | 8098 | `carddemo_dispute` | **新增能力**：争议案件、临时入账、chargeback |
+| collections-service | 8099 | `carddemo_collections` | **新增能力**：逾期分桶、承诺还款、结案 |
+| batch-service | 8100 | `carddemo_batch` | **新增能力**：作业定义与 EOD 执行（计息/对账） |
+| reporting-service | 8101 | `carddemo_reporting` | **新增能力**：交易汇总、试算平衡报表 |
+| notification-service | 8102 | `carddemo_notification` | **新增能力**：模板、通知与发送状态 |
+| document-service | 8103 | `carddemo_document` | **新增能力**：文档元数据、文本内容、归档 |
+| workflow-service | 8104 | `carddemo_workflow` | **新增能力**：流程定义、任务审批/拒绝 |
+| audit-service | 8105 | `carddemo_audit` | **新增能力**：追加式审计事件与检索 |
+| reference-data-service | 8106 | `carddemo_reference` | **新增能力**：币种/国家/假日/产品类别 |
+| bff-service | 8107 | —（无状态） | **新增能力**：客户 360 聚合 |
+| search-service | 8108 | —（无状态） | **新增能力**：客户/交易统一搜索 |
 | authorization-service | 8086 | `carddemo_authorization` | COPAUA0C、COPAUS0C/1C/2C、CBPAUP0C、IMS PAUTSUM0/PAUTDTL1、DB2 AUTHFRDS |
 | marketing-service | 8087 | `carddemo_marketing` | **新增能力**（存量无营销）：活动、报名、返现/积分、活动效果 |
 
@@ -63,8 +122,8 @@ graph LR
 ```
 carddemo-java-1025/
 ├── pom.xml                      # Maven 聚合父 POM（Spring Boot 3.3.6 / Java 21）
-├── docker-compose.yml           # PostgreSQL + 7 个微服务 + Web 界面
-├── docker/postgres/init/        # 7 个 database 初始化
+├── docker-compose.yml           # PostgreSQL + 15 个默认微服务 + Web 界面；extended profile 追加 12 个
+├── docker/postgres/init/        # 25 个 database 初始化
 ├── scripts/build-and-up.sh      # 打包 + 构建镜像 + 启动
 ├── scripts/smoke-test.sh        # 端到端冒烟测试
 ├── docs/
@@ -77,6 +136,26 @@ carddemo-java-1025/
     ├── card-service/
     ├── account-service/
     ├── transaction-service/
+    ├── ledger-service/           # 总账：科目/日记账/试算平衡/关账（新增）
+    ├── reconciliation-service/   # 对账/EOD：批次↔日记账、差异处理（新增）
+    ├── payment-service/          # 支付：受理/筛查/清算/退汇（新增）
+    ├── billing-service/          # 账单：生成/利息/最低还款/支付（新增）
+    ├── limit-service/            # 限额：额度/用量/校验（新增）
+    ├── fx-service/               # 汇率：报价/换汇（新增）
+    ├── loan-service/             # 信贷：申请/审批/放款/还款（新增）
+    ├── fraud-service/            # 欺诈评分/警报（新增）
+    ├── aml-service/              # 制裁筛查/AML 警报（新增）
+    ├── dispute-service/          # 争议/chargeback（新增）
+    ├── collections-service/      # 逾期/催收（新增）
+    ├── batch-service/            # 批处理/EOD（新增）
+    ├── reporting-service/        # 报表（新增）
+    ├── notification-service/     # 通知（新增）
+    ├── document-service/         # 文档（新增）
+    ├── workflow-service/         # 工作流（新增）
+    ├── audit-service/            # 审计（新增）
+    ├── reference-data-service/   # 参考数据（新增）
+    ├── bff-service/              # 客户 360 聚合（新增）
+    ├── search-service/           # 统一搜索（新增）
     ├── authorization-service/
     ├── marketing-service/       # 营销：活动/报名/奖励/效果（新增）
     └── web-ui/                  # 业务界面（静态 SPA）+ 同源 API 代理
@@ -100,7 +179,7 @@ src/main/java/com/carddemo/<context>/
 cd carddemo-java-1025
 ./scripts/build-and-up.sh          # mvn package + docker compose up -d --build
 docker compose ps
-./scripts/smoke-test.sh            # 端到端验证（健康、查询、入账、授权、报表）
+./scripts/smoke-test.sh            # 端到端验证（健康、查询、过账、冻结、授权、报表、营销）
 ```
 
 打开 **http://localhost:8090/** 即为业务界面（登录账号已预填，直接登录）。
@@ -113,7 +192,7 @@ docker compose ps
 全部单元/集成测试：
 
 ```bash
-mvn test        # 197 个用例，H2 + Flyway，多模块并行
+mvn test        # 796 个用例，H2 + Flyway，多模块并行
 ```
 
 ## 3.1 Web 界面（推荐）
@@ -124,7 +203,18 @@ mvn test        # 197 个用例，H2 + Flyway，多模块并行
 |---|---|---|
 | 登录 | 账号已预填，管理员/普通用户切换 | COSGN00C |
 | 首页 | 按角色展示可用功能入口 | COMEN01C / COADM01C |
-| 账户视图 | 账户 + 客户 + 卡片组合展示、可用额度计算 | COACTVWC |
+| 账户视图 | 账户 + 客户 + 卡片组合展示、产品/额度/冻结/可用额度、创建与释放 hold | COACTVWC |
+| 过账 | 过账类型、幂等批次、借贷分录、冲正（钱路径新增） | 新增能力 |
+| 总账 | 科目表、日记账、试算平衡、期间关账、手工记账（钱路径新增） | 新增能力 |
+| 对账与 EOD | 按日对账、差异明细与处理、EOD 作业历史（管理员，钱路径新增） | 新增能力 |
+| 支付 | 创建支付、筛查、接受、清算、退汇（P2 新增） | 新增能力 |
+| 账单 | 生成账单、查看利息/最低还款/到期日、全额支付（P2 新增） | 新增能力 |
+| 限额 | 创建/调整限额、占用/释放、可用性检查（管理员，P2 新增） | 新增能力 |
+| 汇率 | 汇率维护、报价、执行换汇、换汇记录（P2 新增） | 新增能力 |
+| 客户 360 | BFF 聚合账户/卡片/客户/交易/权益，统一搜索（P5 新增） | 新增能力 |
+| 贷款 | 申请、审批/拒绝、放款、还款计划、还款（P3 新增） | 新增能力 |
+| 风险 | 欺诈评分/警报、AML 筛查/警报、争议、催收（P3 新增） | 新增能力 |
+| 运营 | 批处理、报表、通知、文档、工作流、审计、参考数据（P4 新增） | 新增能力 |
 | 信用卡 | 按账户/客户筛选、分页、详情与维护（卡面名/状态/到期） | COCRDLIC / COCRDSLC / COCRDUPC |
 | 交易查询 | 交易号前缀/卡号/账户过滤、分页、详情 | COTRN00C / COTRN01C |
 | 交易录入 | 类型/类别联动选择、完整商户信息、自动生成交易号 | COTRN02C |
@@ -156,6 +246,26 @@ SSN 始终为掩码，CVV 不返回。
 | card | http://localhost:8083/ | http://localhost:8083/v3/api-docs |
 | account | http://localhost:8084/ | http://localhost:8084/v3/api-docs |
 | transaction | http://localhost:8085/ | http://localhost:8085/v3/api-docs |
+| ledger | http://localhost:8088/ | http://localhost:8088/v3/api-docs |
+| reconciliation | http://localhost:8089/ | http://localhost:8089/v3/api-docs |
+| payment | http://localhost:8091/ | http://localhost:8091/v3/api-docs |
+| billing | http://localhost:8092/ | http://localhost:8092/v3/api-docs |
+| limit | http://localhost:8093/ | http://localhost:8093/v3/api-docs |
+| fx | http://localhost:8094/ | http://localhost:8094/v3/api-docs |
+| loan | http://localhost:8095/ | http://localhost:8095/v3/api-docs |
+| fraud | http://localhost:8096/ | http://localhost:8096/v3/api-docs |
+| aml | http://localhost:8097/ | http://localhost:8097/v3/api-docs |
+| dispute | http://localhost:8098/ | http://localhost:8098/v3/api-docs |
+| collections | http://localhost:8099/ | http://localhost:8099/v3/api-docs |
+| batch | http://localhost:8100/ | http://localhost:8100/v3/api-docs |
+| reporting | http://localhost:8101/ | http://localhost:8101/v3/api-docs |
+| notification | http://localhost:8102/ | http://localhost:8102/v3/api-docs |
+| document | http://localhost:8103/ | http://localhost:8103/v3/api-docs |
+| workflow | http://localhost:8104/ | http://localhost:8104/v3/api-docs |
+| audit | http://localhost:8105/ | http://localhost:8105/v3/api-docs |
+| reference | http://localhost:8106/ | http://localhost:8106/v3/api-docs |
+| bff | http://localhost:8107/ | http://localhost:8107/v3/api-docs |
+| search | http://localhost:8108/ | http://localhost:8108/v3/api-docs |
 | authorization | http://localhost:8086/ | http://localhost:8086/v3/api-docs |
 
 登录接口 `POST /api/v1/auth/login` 的请求体已预填演示账号；交易、授权、账单支付、入账、利息等
@@ -195,6 +305,20 @@ curl -s -X POST localhost:8085/api/v1/bill-payments -H 'Content-Type: applicatio
 
 # 交易报表（2026-09，闭区间）
 curl -s "localhost:8085/api/v1/reports/transactions?startDate=2026-09-01&endDate=2026-09-30"
+
+# 过账（幂等批次，账户 6；CARD_PURCHASE = DR 1100 / CR 2100）
+curl -s -X POST localhost:8085/api/v1/posting-batches -H 'Content-Type: application/json' -d '{
+  "idempotencyKey":"demo-posting-0001","typeCode":"CARD_PURCHASE","accountId":"00000000006",
+  "amount":25.00,"currency":"USD","description":"Demo purchase"}'
+
+# 总账试算平衡（2026-10）
+curl -s "localhost:8088/api/v1/trial-balance?period=2026-10"
+
+# 对账（业务日期当天）与 EOD
+curl -s -X POST localhost:8089/api/v1/reconciliation-runs \
+  -H 'Content-Type: application/json' -d '{"businessDate":"2026-10-26"}'
+curl -s -X POST localhost:8089/api/v1/eod-runs \
+  -H 'Content-Type: application/json' -d '{"businessDate":"2026-10-26"}'
 ```
 
 ## 5. 设计要点
@@ -209,6 +333,13 @@ curl -s "localhost:8085/api/v1/reports/transactions?startDate=2026-09-01&endDate
   可用额度同时扣减账户欠款与授权占用、密码 PBKDF2 存储。见规则目录中的 `NR-*`。
 - **营销能力（新增）**：活动/报名/奖励独立成上下文；入账成功后同步评估奖励，失败只告警不回滚账务；
   返现由 account-service 以 `rewardId` 幂等入账，待入账可重试。见 `docs/design/08-marketing-capability.md` 与 ADR-009。
+- **过账与总账（新增）**：过账批次按类型规则生成借贷分录，账户余额变更与分录同事务、总账同步尽力而为；
+  冲正生成反向批次并保留原记录；总账按 `(sourceType, sourceId)` 幂等，试算平衡与期间关账可查。
+  见 `docs/design/11-money-path-slice-a2.md`。
+- **对账与 EOD（新增）**：按业务日期把过账批次与总账 `POSTING_BATCH` 日记账逐笔匹配，
+  识别缺失、金额不符与孤儿分录；差异可登记处理；EOD 触发对账并留痕。见 `docs/design/12-reconciliation-and-eod.md`。
+- **支付与计费（新增）**：支付指令受理→筛查→接受→清算（过账批次）→退汇（冲正）；
+  账单按账户/期间生成，计算利息与最低还款并支持全额支付；限额与 FX 独立服务。见 `docs/design/13-payments-billing-limits-fx.md`。
 
 ## 6. 文档
 
@@ -217,11 +348,19 @@ curl -s "localhost:8085/api/v1/reports/transactions?startDate=2026-09-01&endDate
 | [docs/README.md](docs/README.md) | 全部文档索引 |
 | [docs/legacy/02-five-level-model.md](docs/legacy/02-five-level-model.md) | L1–L5 业务模型（带证据） |
 | [docs/legacy/03-business-rule-catalog.md](docs/legacy/03-business-rule-catalog.md) | 业务规则 → 实现落点 → 状态 |
-| [docs/design/02-bounded-contexts.md](docs/design/02-bounded-contexts.md) | 6 个限界上下文 |
+| [docs/design/02-bounded-contexts.md](docs/design/02-bounded-contexts.md) | 27 个限界上下文 |
 | [docs/design/05-api-catalog.md](docs/design/05-api-catalog.md) | 全部 API 契约与种子数据 |
-| [docs/design/06-traceability-matrix.md](docs/design/06-traceability-matrix.md) | 44 个遗留程序的去向（营销为新增能力） |
+| [docs/design/06-traceability-matrix.md](docs/design/06-traceability-matrix.md) | 44 个遗留程序的去向（营销/总账/对账/支付/账单为新增能力） |
 | [docs/design/08-marketing-capability.md](docs/design/08-marketing-capability.md) | 营销场景、领域模型、积分/返现规则与前后台改造 |
-| [docs/design/adr/README.md](docs/design/adr/README.md) | 9 个架构决策 |
+| [docs/design/09-scale-up-blueprint.md](docs/design/09-scale-up-blueprint.md) | 规模化蓝图与分阶段路线图 |
+| [docs/design/10-money-path-slice-a1.md](docs/design/10-money-path-slice-a1.md) | A1：账户产品化、冻结、可用额度 |
+| [docs/design/11-money-path-slice-a2.md](docs/design/11-money-path-slice-a2.md) | A2：过账引擎、总账、试算平衡与前台 |
+| [docs/design/12-reconciliation-and-eod.md](docs/design/12-reconciliation-and-eod.md) | A1.4：对账、差异处理与 EOD 作业 |
+| [docs/design/13-payments-billing-limits-fx.md](docs/design/13-payments-billing-limits-fx.md) | P2：支付、账单、限额与 FX |
+| [docs/design/14-risk-credit-collections.md](docs/design/14-risk-credit-collections.md) | P3：信贷、欺诈、AML、争议、催收、批处理 |
+| [docs/design/15-operations-support.md](docs/design/15-operations-support.md) | P4：报表、通知、文档、工作流、审计、参考数据 |
+| [docs/design/16-channel-and-quality.md](docs/design/16-channel-and-quality.md) | P5/P6：BFF、搜索、门户、性能、混沌与安全 |
+| [docs/design/adr/README.md](docs/design/adr/README.md) | 12 个架构决策 |
 | [docs/ops/01-docker-runbook.md](docs/ops/01-docker-runbook.md) | Docker 调试运行手册 |
 
 ## 7. 已知限制（POC 范围）
@@ -234,3 +373,15 @@ curl -s "localhost:8085/api/v1/reports/transactions?startDate=2026-09-01&endDate
 5. 单账户并发授权使用乐观锁，热点账户需重试；压测与分区方案待补（未解决项 U1）。
 6. **营销为新增能力**：入账后同步评估（最坏 +2s，营销不可用不影响入账）；预算并发极端情况下可能超发 1 笔；
    积分仅记录、暂不支持兑换；活动叠加策略需业务确认（`08-marketing-capability.md` §8）。
+7. **总账为新增能力**：过账后同步调用总账，失败只告警（`ledgerEntryId` 为空），尚无 Outbox 重试；
+   试算平衡按发生额汇总，不包含期初余额；期间关账暂不支持反关账。
+8. **对账为新增能力**：当前只做“过账批次 ↔ 总账日记账”与试算平衡检查；账户余额 vs 总账 1100
+   需要按账户的子账映射（未实现）。EOD 目前只编排对账，计息/账单/总账结转待扩展。
+9. **支付为演示级**：无真实 ISO 20022/SWIFT/ACH 报文、清算网络与 cut-off；制裁筛查为硬编码名单。
+10. **账单/限额/FX 为演示级**：账单基于当前账户快照生成，无历史周期、滞纳金与分期；
+    限额尚未接入授权链路；FX 仅支持直接货币对，无三角套算与敞口管理。
+11. **P3/P4/P5 为演示级**：贷款/欺诈/AML/争议/催收为单聚合状态机；批处理同步调用、无调度器；
+    报表/通知/文档/工作流/审计/参考数据为轻量实现；搜索为实时过滤，无 OpenSearch 索引；
+    BFF 串行聚合，未做并行/缓存。
+12. **扩展服务默认不启动**：为控制内存，P3/P4 的 12 个服务放在 Compose `extended` profile，
+    使用 `docker compose --profile extended up -d` 启动；默认运行 17 个容器。

@@ -18,6 +18,26 @@ proxy:
   transaction-service-url: ${TRANSACTION_SERVICE_URL:http://localhost:8085}
   authorization-service-url: ${AUTHORIZATION_SERVICE_URL:http://localhost:8086}
   marketing-service-url: ${MARKETING_SERVICE_URL:http://localhost:8087}
+  ledger-service-url: ${LEDGER_SERVICE_URL:http://localhost:8088}
+  reconciliation-service-url: ${RECONCILIATION_SERVICE_URL:http://localhost:8089}
+  payment-service-url: ${PAYMENT_SERVICE_URL:http://localhost:8091}
+  billing-service-url: ${BILLING_SERVICE_URL:http://localhost:8092}
+  limit-service-url: ${LIMIT_SERVICE_URL:http://localhost:8093}
+  fx-service-url: ${FX_SERVICE_URL:http://localhost:8094}
+  bff-service-url: ${BFF_SERVICE_URL:http://localhost:8107}
+  search-service-url: ${SEARCH_SERVICE_URL:http://localhost:8108}
+  loan-service-url: ${LOAN_SERVICE_URL:http://localhost:8095}
+  fraud-service-url: ${FRAUD_SERVICE_URL:http://localhost:8096}
+  aml-service-url: ${AML_SERVICE_URL:http://localhost:8097}
+  dispute-service-url: ${DISPUTE_SERVICE_URL:http://localhost:8098}
+  collections-service-url: ${COLLECTIONS_SERVICE_URL:http://localhost:8099}
+  batch-service-url: ${BATCH_SERVICE_URL:http://localhost:8100}
+  reporting-service-url: ${REPORTING_SERVICE_URL:http://localhost:8101}
+  notification-service-url: ${NOTIFICATION_SERVICE_URL:http://localhost:8102}
+  document-service-url: ${DOCUMENT_SERVICE_URL:http://localhost:8103}
+  workflow-service-url: ${WORKFLOW_SERVICE_URL:http://localhost:8104}
+  audit-service-url: ${AUDIT_SERVICE_URL:http://localhost:8105}
+  reference-service-url: ${REFERENCE_SERVICE_URL:http://localhost:8106}
 
 management:
   endpoints:

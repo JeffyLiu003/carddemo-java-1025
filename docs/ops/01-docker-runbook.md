@@ -34,10 +34,15 @@ docker compose down
 
 # 停止并清空数据库（Flyway 重新执行种子）
 docker compose down -v
+
+# 扩展服务（P3/P4，12 个；内存 ≥16GB 再全开）
+docker compose --profile extended up -d
+docker compose --profile extended ps
 ```
 
-启动顺序：`postgres`（`pg_isready` 健康检查）→ 无依赖服务 → `transaction` / `authorization` → `marketing` / `web-ui`。
-下游客户端是懒加载的，服务启动不依赖下游可用；调用失败时返回 503。
+启动顺序：`postgres`（`pg_isready` 健康检查）→ 无依赖服务 → `transaction` / `authorization` →
+`marketing` / `bff` / `search` / `web-ui`。下游客户端是懒加载的，服务启动不依赖下游可用；
+调用失败时返回 503。
 
 打开 **http://localhost:8090/** 即为业务界面（登录账号已预填）。
 
@@ -47,7 +52,8 @@ docker compose down -v
 ./scripts/smoke-test.sh
 ```
 
-覆盖：6 个健康探针、登录、账户/客户/卡查询、日终入账、授权决策、交易报表。
+覆盖：默认 13 个健康探针、登录、账户/客户/卡、冻结、过账/总账/对账/EOD、支付/账单/限额/FX、营销。
+扩展服务（贷款/风险/运营）需先 `--profile extended up -d`，按 `README.md` 页面逐项验证。
 
 手工验证命令见 `README.md` §4。
 
@@ -120,6 +126,26 @@ DB_HOST=localhost DB_NAME=carddemo_account mvn -f services/account-service/pom.x
 | transaction | http://localhost:8085/ | http://localhost:8085/v3/api-docs |
 | authorization | http://localhost:8086/ | http://localhost:8086/v3/api-docs |
 | marketing | http://localhost:8087/ | http://localhost:8087/v3/api-docs |
+| ledger | http://localhost:8088/ | http://localhost:8088/v3/api-docs |
+| reconciliation | http://localhost:8089/ | http://localhost:8089/v3/api-docs |
+| payment | http://localhost:8091/ | http://localhost:8091/v3/api-docs |
+| billing | http://localhost:8092/ | http://localhost:8092/v3/api-docs |
+| limit | http://localhost:8093/ | http://localhost:8093/v3/api-docs |
+| fx | http://localhost:8094/ | http://localhost:8094/v3/api-docs |
+| loan | http://localhost:8095/ | http://localhost:8095/v3/api-docs |
+| fraud | http://localhost:8096/ | http://localhost:8096/v3/api-docs |
+| aml | http://localhost:8097/ | http://localhost:8097/v3/api-docs |
+| dispute | http://localhost:8098/ | http://localhost:8098/v3/api-docs |
+| collections | http://localhost:8099/ | http://localhost:8099/v3/api-docs |
+| batch | http://localhost:8100/ | http://localhost:8100/v3/api-docs |
+| reporting | http://localhost:8101/ | http://localhost:8101/v3/api-docs |
+| notification | http://localhost:8102/ | http://localhost:8102/v3/api-docs |
+| document | http://localhost:8103/ | http://localhost:8103/v3/api-docs |
+| workflow | http://localhost:8104/ | http://localhost:8104/v3/api-docs |
+| audit | http://localhost:8105/ | http://localhost:8105/v3/api-docs |
+| reference | http://localhost:8106/ | http://localhost:8106/v3/api-docs |
+| bff | http://localhost:8107/ | http://localhost:8107/v3/api-docs |
+| search | http://localhost:8108/ | http://localhost:8108/v3/api-docs |
 
 登录：`POST /api/v1/auth/login` → `Try it out`（body 已预填 `ADMIN001/admin123`）→ `Execute`。
 若想用普通用户：改为 `USER0001/user1234`。
@@ -140,7 +166,7 @@ Compose 增加 `ports: ["5005:5005"]`，IDE 以 Remote JVM Debug 连接。
 | `docker compose build` 报拉取 `eclipse-temurin` 超时 | Docker Hub 不可达 | 使用本机已有镜像（当前 Dockerfile 已如此）；或配置镜像加速器 |
 | 服务启动即退出，日志 `Connection refused` | PostgreSQL 未就绪 | 确认 `postgres` 容器 healthy；`docker compose down -v` 后重试 |
 | `FlywayValidateException: checksum mismatch` | 修改了已执行的迁移脚本 | 演示环境 `docker compose down -v` 重新初始化；生产环境新增迁移版本，禁止改历史脚本 |
-| 端口被占用 | 本机已有服务 | 修改 `docker-compose.yml` 端口映射，或释放端口（5432/8081–8087/8090） |
+| 端口被占用 | 本机已有服务 | 修改 `docker-compose.yml` 端口映射，或释放端口（5432/8081–8108/8090） |
 | 打开 8080 不是本界面 | 宿主机 8080 已被其他程序占用，本工程映射到 **8090** | 使用 http://localhost:8090/；如需 8080，先释放占用再改 compose 映射 |
 | 活动中心为空 | 活动不是 ACTIVE，或已过活动期 | 用管理员在 `#/campaigns` 发布活动；检查起止时间 |
 | 消费后没有返现 | 未报名、类别/金额不满足、次数或预算用尽 | 在 `#/offers` 查看资格原因；在活动详情看预算使用率 |
@@ -149,7 +175,8 @@ Compose 增加 `ports: ["5005:5005"]`，IDE 以 Remote JVM Debug 连接。
 | 入账返回 `103` 拒付 | 账户到期日早于交易原始日期 | 种子账户 1–5、7 的到期日已过，用账户 6（2027-03-09）或 8（2028-09-30）演示 |
 | 授权返回 `4100` | 可用额度 = 额度 − 当前欠款 − 待授权占用 | 属预期；账户 1 可用额度为 80.00 |
 | 交易号重复 | 入账 `transactionId` 已存在 | 入账按幂等处理（计入 posted + duplicates），换一个新交易号可验证新记账 |
-| 容器内存不足 | 6 个 JVM + PG | Docker Desktop 分配 ≥ 6GB；或减少并行构建 `COMPOSE_PARALLEL_LIMIT=2` |
+| 容器内存不足 | 默认 17 容器（16 JVM + PG）；extended 共 29 容器 | 默认 ≥10GB；全开 ≥16GB。8.3GB 实测：默认 17 稳定，扩展建议每批 ≤6 个、验证后停止 |
+| 服务启动报 `too many clients already` | 服务数 × Hikari 10 > PostgreSQL 默认 100 | Compose 已设置 `max_connections=300`；如自定义 PG，请同步调大 |
 
 ## 6. 数据重置与重建
 
@@ -161,7 +188,7 @@ docker compose up -d --build
 
 ## 7. 已知安全缺口（必须知晓）
 
-1. **资源服务未强制校验 token**（ADR-007）：8081–8086 端口等同内网可信调用。
+1. **资源服务未强制校验 token**（ADR-007）：8081–8108 端口等同内网可信调用。
    仅限本机/隔离网络演示，禁止暴露公网或生产使用。
 2. 生产化前必须：接入 API 网关统一鉴权（OAuth2/OIDC）、服务间 mTLS、密钥托管
    （`IAM_TOKEN_SECRET` 不得使用默认值）、审计日志与限流。
@@ -172,15 +199,29 @@ docker compose up -d --build
 
 | 项 | 结果 |
 |---|---|
-| `mvn test`（6 模块） | 160 用例全绿 |
-| `docker compose up -d --build` | 7 个容器启动，6 个服务 health=UP |
+| `mvn test`（30 模块） | 796 用例全绿 |
+| `mvn verify` | JaCoCo 28 份报告；ArchUnit 2 条规则通过 |
+| `docker compose up -d --build` | 17 个默认容器启动，15 个服务 health=UP |
+| `docker compose --profile extended up -d` | 追加 12 个扩展服务（总 29 容器） |
 | 冒烟：登录/账户/客户/卡 | 通过 |
 | 冒烟：入账（正常 + 超限 102） | 通过 |
 | 冒烟：授权（批准 50 / 超额 4100 / 汇总占用） | 通过 |
 | 冒烟：账单支付（1940 → 余额 0） | 通过 |
 | 冒烟：报表（6 笔，合计 2613.12） | 通过 |
-| Swagger UI（6 个服务根路径 302 → `/swagger-ui/index.html`，HTTP 200） | 通过 |
+| 冒烟：账户冻结（创建/额度扣减/释放） | 通过 |
+| 冒烟：过账 → 总账日记账 → 试算平衡 → 冲正 | 通过 |
+| 冒烟：对账（批次↔日记账）与 EOD | 通过 |
+| 冒烟：支付受理→接受→清算→退汇 | 通过 |
+| 冒烟：账单生成/限额检查/换汇报价 | 通过 |
+| 扩展：贷款申请→审批→放款→还款 | 通过 |
+| 扩展：欺诈评分/警报、AML 筛查、争议、催收 | 通过 |
+| 扩展：报表、通知、文档、工作流、审计、参考数据 | 通过 |
+| 扩展：BFF 客户 360 与统一搜索 | 通过 |
+| P6：k6 脚本、混沌脚本、JaCoCo、ArchUnit | 已交付/通过 |
+| Swagger UI（27 个服务根路径 302 → `/swagger-ui/index.html`，HTTP 200） | 通过 |
 | Web 界面（8090 首页 200、静态资源 MIME 正确、同源代理登录/查询/404） | 通过 |
+| 对账/EOD 页面语法与代理路由（`node --check`、`/api/v1/reconciliation-runs`） | 通过 |
+| 支付/账单/限额/FX 页面语法与代理路由（`node --check`、四组前缀） | 通过 |
 | 前端脚本语法（`node --check app.js`） | 通过 |
 | UI 只读端到端（jsdom 驱动真实界面：登录、菜单、账户/卡片/交易/报表/授权/用户、角色权限） | 18/18 通过 |
 | UI 写操作端到端（交易录入、账单支付、卡片维护、用户增删、欺诈标记） | 7/7 通过 |
