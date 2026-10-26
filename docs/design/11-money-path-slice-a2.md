@@ -115,7 +115,7 @@
 | 1100 | Card Receivables | ASSET |
 | 2000 | Customer Deposits | LIABILITY |
 | 2100 | Merchant Payable | LIABILITY |
-| 2200 | Rewards Payable | LIABILITY |
+| 2200 | Other Payable | LIABILITY |
 | 4000 | Fee Income | REVENUE |
 | 4100 | Interest Income | REVENUE |
 | 5000 | Interest Expense | EXPENSE |

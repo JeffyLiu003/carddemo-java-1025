@@ -31,15 +31,14 @@
 | iam-service | 36 | 1,601 | 7 | 登录、用户 CRUD |
 | customer-service | 20 | 1,551 | 4 | 客户 CRUD |
 | card-service | 23 | 1,303 | 5 | 卡片 CRUD、按账户查询 |
-| account-service | 22 | 1,050 | 7 | 账户、入账、还款、利息计提、返现入账 |
+| account-service | 22 | 1,050 | 7 | 账户、入账、还款、利息计提、产品与冻结 |
 | transaction-service | 93 | 4,189 | 10 | 交易查询、入账、利息运行、账单支付 |
-| authorization-service | 46 | 2,660 | 6 | 授权决策、限额、 velocity |
-| marketing-service | 54 | 3,122 | 15 | 活动、报名、奖励评估与入账 |
+| authorization-service | 46 | 2,660 | 6 | 授权决策、限额、velocity |
 | web-ui | 4 | 241 | - | 静态页面 + 反向代理 |
 | **合计** | **298** | **15,717** | **54** | 36 张表、197 个测试 |
 
-> 上表为规模化分析时的快照。A1.1–A1.4、P2、P3–P5 落地后：全仓 52,060 行 Java / 965 个文件 / 796 个测试，
-> 27 个业务服务 + web-ui；默认 17 个容器，`--profile extended` 追加 12 个扩展服务。
+> 上表为规模化分析时的快照。A1.1–A1.4、P2、P3–P5 落地后：全仓 48,374 行 Java / 903 个文件 / 762 个测试，
+> 26 个业务服务 + web-ui；默认 16 个容器，`--profile extended` 追加 12 个扩展服务。
 
 补充事实：
 
@@ -73,7 +72,6 @@
 - 卡片：借记/信用/预付、联名卡、虚拟卡、附属卡；额度、取现限额、商户类别限制、地区限制。
 - 贷款：个人贷、车贷、房贷、循环额度；利率类型、还款方式（等额本息/等额本金/气球）、罚息、提前还款。
 - 存款：定期产品、利率档位、自动转存、提前支取罚息。
-- 营销：客群、资格规则、预算、奖励计算、叠加与排他。
 
 每个产品都是一组可配置参数 + 规则 + 生命周期，而不是一个枚举值。
 
@@ -112,7 +110,7 @@
 | Core | 账单与计费 | billing-service |
 | Core | 风险与反欺诈 | fraud-service、aml-service |
 | Supporting | 客户与 KYC | customer-service |
-| Supporting | 营销与忠诚度 | marketing-service |
+| Supporting | 对账与运营 | reconciliation-service、batch-service、reporting-service |
 | Supporting | 争议与催收 | dispute-service、collections-service |
 | Supporting | 通知与文档 | notification-service、document-service |
 | Supporting | 报表与分析 | reporting-service |
@@ -135,7 +133,7 @@
 | account-service | 1,050 | 产品参数、透支、冻结/预留、计息、费用、对账单、销户、多币种 | 60,000 | 60 | 40 |
 | transaction-service | 4,189 | 30+ 交易类型、过账引擎、转账、standing order、bill pay、冲正、定时任务 | 70,000 | 70 | 45 |
 | authorization-service | 2,660 | 决策流水线、velocity、限额、欺诈评分、3DS、部分批准、stand-in | 45,000 | 35 | 25 |
-| marketing-service | 3,122 | 客群、资格 DSL、预算、A/B、积分账户、归因、叠加排他 | 35,000 | 50 | 25 |
+| reconciliation-service | 1,800 | 对账/EOD、差异处理、补偿 | 45,000 | 35 | 30 |
 | payment-service | 新增 | ACH/SEPA/电汇/RTP、ISO 20022、SWIFT、截止时间、退汇、筛查 | 80,000 | 80 | 50 |
 | ledger-service | 新增 | 科目表、日记账、过账规则、期间关账、试算平衡、子账对账 | 45,000 | 35 | 30 |
 | billing-service | 新增 | 账单周期、利率/APR、最低还款、费用、账单生成、宽限期、滞纳金 | 45,000 | 40 | 30 |
@@ -230,7 +228,7 @@
 | 阶段 | 主题 | 累计 LOC | 端点 | 表 | 关键交付 |
 |---|---|---:|---:|---:|---|
 | P0 | 平台底座与工程骨架 | 25k | 60 | 40 | 共享库、事件总线+outbox、网关骨架、测试/契约/ArchUnit、数据生成器 |
-| P1 | 现有 7 服务加深 | 110k | 180 | 90 | 产品参数、账户透支/冻结/费用、交易类型与冲正、授权规则、卡生命周期、KYC、RBAC/MFA、营销客群/积分 |
+| P1 | 现有 7 服务加深 | 110k | 180 | 90 | 产品参数、账户透支/冻结/费用、交易类型与冲正、授权规则、卡生命周期、KYC、RBAC/MFA |
 | P2 | 资金与账务 | 250k | 380 | 200 | payment、ledger、billing、limit、FX、reconciliation；ISO 20022 与批量文件 |
 | P3 | 信贷与风险 | 400k | 560 | 300 | loan、credit、fraud、aml、dispute、collections |
 | P4 | 运营与报表 | 560k | 720 | 400 | batch/EOD、reporting、document、notification、workflow、audit、reference-data |

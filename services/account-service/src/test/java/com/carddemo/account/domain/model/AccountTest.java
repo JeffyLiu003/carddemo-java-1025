@@ -71,18 +71,6 @@ class AccountTest {
     }
 
     @Test
-    void cashbackReducesBalanceAndRejectsNonPositiveAmount() {
-        Account account = account("100.00");
-
-        account.applyCashback(new BigDecimal("20.00"));
-
-        assertThat(account.getCurrentBalance()).isEqualByComparingTo("80.00");
-        assertThatThrownBy(() -> account.applyCashback(BigDecimal.ZERO))
-                .isInstanceOf(BusinessRuleException.class)
-                .extracting("code").isEqualTo("INVALID_CASHBACK_AMOUNT");
-    }
-
-    @Test
     void availableCreditSubtractsBalanceAndActiveHolds() {
         Account account = account("100.00");
 

@@ -9,7 +9,7 @@
 | customer-service | 8082 | `carddemo_customer` | 客户查询/新增/修改 | 无 |
 | card-service | 8083 | `carddemo_card` | 卡列表/详情/维护、按账户查卡 | 无 |
 | account-service | 8084 | `carddemo_account` | 账户查询/维护、产品目录、额度与可用额度、资金冻结、记账、还款、利息入账 | 无 |
-| transaction-service | 8085 | `carddemo_transaction` | 交易录入/查询、入账、利息、账单支付、报表、交易类型、过账引擎 | card、account、marketing、ledger |
+| transaction-service | 8085 | `carddemo_transaction` | 交易录入/查询、入账、利息、账单支付、报表、交易类型、过账引擎 | card、account、ledger |
 | ledger-service | 8088 | `carddemo_ledger` | 科目表、日记账、冲正、试算平衡、期间关账 | 无 |
 | reconciliation-service | 8089 | `carddemo_reconciliation` | 批次↔日记账对账、差异处理、EOD 作业 | transaction、ledger |
 | payment-service | 8091 | `carddemo_payment` | 支付受理/筛查/接受/清算/退汇 | account、transaction |
@@ -28,10 +28,9 @@
 | workflow-service | 8104 | `carddemo_workflow` | 流程定义/任务审批 | 无 |
 | audit-service | 8105 | `carddemo_audit` | 追加式审计事件 | 无 |
 | reference-data-service | 8106 | `carddemo_reference` | 参考数据 | 无 |
-| bff-service | 8107 | — | 客户 360 聚合 | account、card、customer、transaction、marketing |
+| bff-service | 8107 | — | 客户 360 聚合 | account、card、customer、transaction |
 | search-service | 8108 | — | 客户/交易搜索 | customer、transaction |
 | authorization-service | 8086 | `carddemo_authorization` | 授权决策、待授权汇总、欺诈标记、过期清理 | card、account、customer |
-| marketing-service | 8087 | `carddemo_marketing` | 活动/报名/奖励评估/效果统计 | account |
 
 ## 2. 数据所有权
 
@@ -62,20 +61,17 @@
 | `audit_event` | audit | 追加式审计事件 |
 | `reference_item` | reference | 参考数据 |
 | `auth_summary`、`auth_detail` | authorization | 待授权汇总与明细 |
-| `campaign`、`enrollment`、`reward_grant` | marketing | 活动、报名与奖励（奖励评估与幂等） |
-| `reward_credit` | account | 返现入账幂等记录（rewardId 唯一） |
 
 ## 3. 服务间调用矩阵
 
-| 调用方 → 被调方 | Card | Account | Customer | Transaction | Marketing | Ledger | Reconciliation |
-|---|---|---|---|---|---|---|---|
-| transaction-service | GET 卡快照 | GET 快照 / POST 记账 / POST 还款 / POST 利息 | — | — | POST 奖励评估 | POST 日记账 | — |
-| authorization-service | GET 卡快照 | GET 快照 | GET 客户存在性 | — | — | — | — |
-| marketing-service | — | GET 快照 / POST 返现入账 | — | — | — | — | — |
-| reconciliation-service | — | — | — | GET 过账批次 | — | GET 日记账/试算平衡 | — |
-| payment-service | — | GET 账户 | — | POST 过账/冲正 | — | — | — |
-| billing-service | — | GET 账户/产品、POST 还款 | — | — | — | — | — |
-| ledger-service | — | — | — | — | — | — | — |
+| 调用方 → 被调方 | Card | Account | Customer | Transaction | Ledger | Reconciliation |
+|---|---|---|---|---|---|---|
+| transaction-service | GET 卡快照 | GET 快照 / POST 记账 / POST 还款 / POST 利息 | — | — | POST 日记账 | — |
+| authorization-service | GET 卡快照 | GET 快照 | GET 客户存在性 | — | — | — |
+| reconciliation-service | — | — | — | GET 过账批次 | GET 日记账/试算平衡 | — |
+| payment-service | — | GET 账户 | — | POST 过账/冲正 | — | — |
+| billing-service | — | GET 账户/产品、POST 还款 | — | — | — | — |
+| ledger-service | — | — | — | — | — | — |
 | account-service | — | — | — | — | — | — |
 | card-service | — | — | — | — | — | — |
 | customer-service | — | — | — | — | — | — |
@@ -90,8 +86,6 @@
 | 账单支付 | transaction → account GET(1) + account POST(1) + card(1) | +30ms |
 | 利息运行 | transaction → account POST(每账户 1 次) | 账户数 × 10ms |
 | 授权决策 | authorization → card(1) + account(1) + customer(1) | +30ms |
-| 消费入账后奖励评估 | transaction → marketing(1)；marketing → account GET(1) + cashback POST(1) | +40ms（失败仅告警） |
-| 活动中心 | marketing → account GET(1) | +10ms |
 | 创建过账批次 | transaction → account GET(1) + account POST(1) + ledger POST(1) | +40ms（总账失败仅告警） |
 | 执行对账 | reconciliation → transaction GET(≤40 页) + ledger GET(≤40 页) + trial GET(1) | 数据量相关；本地 Compose 约 +50ms |
 | 执行 EOD | reconciliation → 对账(1) | 同对账 |
@@ -130,22 +124,21 @@
 
 ```
 docker compose
-├── postgres (16)                # 单实例，25 个 database（init 脚本创建，max_connections=300）
+├── postgres (16)                # 单实例，24 个 database（init 脚本创建，max_connections=300）
 ├── iam-service        :8081
 ├── customer-service   :8082
 ├── card-service       :8083
 ├── account-service    :8084
-├── transaction-service:8085  → 依赖 card/account/marketing/ledger started
+├── transaction-service:8085  → 依赖 card/account/ledger started
 ├── ledger-service     :8088  → 依赖 postgres healthy
 ├── reconciliation-service:8089 → 依赖 postgres/transaction/ledger started
 ├── payment-service    :8091  → 依赖 postgres/account/transaction started
 ├── billing-service    :8092  → 依赖 postgres/account started
 ├── limit-service      :8093  → 依赖 postgres healthy
 ├── fx-service         :8094  → 依赖 postgres healthy
-├── bff-service        :8107  → 依赖 account/card/customer/transaction/marketing
+├── bff-service        :8107  → 依赖 account/card/customer/transaction
 ├── search-service     :8108  → 依赖 customer/transaction
 ├── authorization-service:8086 → 依赖 card/account/customer healthy
-├── marketing-service  :8087 → 依赖 postgres healthy、account started
 └── web-ui             :8090 → 宿主机 8090 映射容器 8080（宿主 8080 被占用）
 
 # docker compose --profile extended up -d 追加：
@@ -164,7 +157,7 @@ docker compose
 ```
 
 > `web-ui` 是**表现层**，不是限界上下文：它只托管静态 SPA，并把 `/api/**` 按路径前缀同源代理到
-> 27 个微服务，不拥有任何业务数据、不实现业务规则。浏览器因此只需访问一个源，无需 CORS。
+> 26 个微服务，不拥有任何业务数据、不实现业务规则。浏览器因此只需访问一个源，无需 CORS。
 
 启动顺序：`postgres`（healthcheck: `pg_isready`）→ 无依赖服务 → `ledger` → `transaction` →
 `reconciliation` / `authorization` / `web-ui`。
@@ -191,7 +184,5 @@ docker compose
 | `CARD_SERVICE_URL` | transaction、authorization | `http://localhost:8083`（Compose 内 `http://card-service:8083`） |
 | `ACCOUNT_SERVICE_URL` | transaction、authorization | `http://localhost:8084` |
 | `CUSTOMER_SERVICE_URL` | authorization | `http://localhost:8082` |
-| `MARKETING_SERVICE_URL` | transaction、web-ui | `http://localhost:8087` |
-| `MARKETING_ENABLED` | transaction | `true`（关闭后不再触发奖励评估） |
 | `IAM_TOKEN_SECRET` | iam | 演示密钥（生产必须从密钥管理注入） |
 | `IAM_TOKEN_TTL_SECONDS` | iam | `3600` |

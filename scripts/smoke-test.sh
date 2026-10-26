@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 端到端冒烟测试：健康探针 → 登录 → 查询 → 入账 → 授权 → 报表 → 营销
+# 端到端冒烟测试：健康探针 → 登录 → 查询 → 入账 → 授权 → 报表 → 支付/对账 → BFF/搜索
 set -euo pipefail
 
 IAM=${IAM:-http://localhost:8081}
@@ -8,7 +8,6 @@ CARD=${CARD:-http://localhost:8083}
 ACCOUNT=${ACCOUNT:-http://localhost:8084}
 TRANSACTION=${TRANSACTION:-http://localhost:8085}
 AUTHORIZATION=${AUTHORIZATION:-http://localhost:8086}
-MARKETING=${MARKETING:-http://localhost:8087}
 LEDGER=${LEDGER:-http://localhost:8088}
 RECONCILIATION=${RECONCILIATION:-http://localhost:8089}
 PAYMENT=${PAYMENT:-http://localhost:8091}
@@ -20,7 +19,7 @@ say() { printf '\n== %s\n' "$*"; }
 json() { python3 -c "import json,sys; d=json.load(sys.stdin); print(json.dumps(d, ensure_ascii=False)[:400])"; }
 
 say "1/8 健康探针"
-for svc in "$IAM" "$CUSTOMER" "$CARD" "$ACCOUNT" "$TRANSACTION" "$AUTHORIZATION" "$MARKETING" "$LEDGER" "$RECONCILIATION" "$PAYMENT" "$BILLING" "$LIMIT" "$FX"; do
+for svc in "$IAM" "$CUSTOMER" "$CARD" "$ACCOUNT" "$TRANSACTION" "$AUTHORIZATION" "$LEDGER" "$RECONCILIATION" "$PAYMENT" "$BILLING" "$LIMIT" "$FX"; do
   status=$(curl -sf -m 5 "$svc/actuator/health" | python3 -c "import json,sys; print(json.load(sys.stdin)['status'])")
   echo "  $svc -> $status"
 done
@@ -119,12 +118,10 @@ say "7/8 交易报表（2026-09 闭区间）"
 curl -sf -m 10 "$TRANSACTION/api/v1/reports/transactions?startDate=2026-09-01&endDate=2026-09-30" \
   | python3 -c "import json,sys; d=json.load(sys.stdin); print({k: d[k] for k in ('total','pageTotal','grandTotal')})"
 
-say "8/8 营销：活动、活动中心、奖励与看板"
-curl -sf -m 5 "$MARKETING/api/v1/campaigns" \
-  | python3 -c "import json,sys; d=json.load(sys.stdin); print('campaigns:', [(i['name'], i['status']) for i in d['items']])"
-curl -sf -m 5 "$MARKETING/api/v1/eligibilities?accountId=00000000001&cardNumber=0500024453765740&customerId=000000001" \
-  | python3 -c "import json,sys; d=json.load(sys.stdin); print('offers:', [(i['name'], i['enrolled'], i['eligible']) for i in d['items']])"
-curl -sf -m 5 "$MARKETING/api/v1/rewards?accountId=00000000001" | json
-curl -sf -m 5 "$MARKETING/api/v1/marketing/summary" | json
+say "8/8 BFF 客户 360 与统一搜索"
+curl -sf -m 5 "http://localhost:8107/api/v1/bff/customer-overview?accountId=00000000001" \
+  | python3 -c "import json,sys; d=json.load(sys.stdin); print('bff:', d['accountId'], 'cards=', len(d['cards']), 'degraded=', d['degraded'])"
+curl -sf -m 5 "http://localhost:8108/api/v1/search?q=Kessler&type=CUSTOMER" \
+  | python3 -c "import json,sys; d=json.load(sys.stdin); print('search:', d['total'], [i['title'] for i in d['items'][:3]])"
 
 printf '\n冒烟测试完成。\n'

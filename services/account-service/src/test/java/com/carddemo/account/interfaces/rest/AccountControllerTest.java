@@ -100,27 +100,6 @@ class AccountControllerTest {
     }
 
     @Test
-    void cashbackCreditIsIdempotentPerRewardId() throws Exception {
-        BigDecimal before = balanceOf("00000000008");
-        String body = """
-                {"rewardId":"r-test-0001","campaignId":"c-test-0001","amount":6.00}
-                """;
-
-        mockMvc.perform(post("/api/v1/accounts/00000000008/cashback-credits")
-                        .contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isOk());
-
-        BigDecimal afterFirst = balanceOf("00000000008");
-        assertThat(afterFirst).isEqualByComparingTo(before.subtract(new BigDecimal("6.00")));
-
-        mockMvc.perform(post("/api/v1/accounts/00000000008/cashback-credits")
-                        .contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isOk());
-
-        assertThat(balanceOf("00000000008")).isEqualByComparingTo(afterFirst);
-    }
-
-    @Test
     void updateRejectsInvalidStatus() throws Exception {
         String body = """
                 {

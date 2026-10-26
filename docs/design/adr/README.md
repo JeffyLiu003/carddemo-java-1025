@@ -10,7 +10,6 @@
 | ADR-006 | 并发控制改为乐观锁 | 已接受 | `07-java-conventions.md` §6 |
 | ADR-007 | 鉴权强制校验的范围（POC） | 已接受（有风险） | `docs/ops/01-docker-runbook.md` §7 |
 | ADR-008 | 密码存储与登录错误语义 | 已接受 | `02-bounded-contexts.md` §IAM |
-| ADR-009 | 营销奖励的评估与入账集成方式 | 已接受 | `08-marketing-capability.md` §3 |
 | ADR-010 | 过账引擎与总账的职责分离 | 已接受 | `11-money-path-slice-a2.md` §2–3 |
 | ADR-011 | 对账只读与差异处理边界 | 已接受 | `12-reconciliation-and-eod.md` §2、§5 |
 | ADR-012 | 支付清算通过过账批次落账 | 已接受 | `13-payments-billing-limits-fx.md` §2 |

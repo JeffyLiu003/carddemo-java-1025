@@ -13,7 +13,7 @@ public class OpenApiConfig {
         return new OpenAPI().info(new Info()
                 .title("CardDemo BFF Service")
                 .version("1.0.0")
-                .description("渠道聚合：客户 360 概览。并行聚合 account/card/customer/transaction/marketing，"
+                .description("渠道聚合：客户 360 概览。聚合 account/card/customer/transaction，"
                         + "非账户下游失败只降级（degraded 列出服务名），不影响整体 200。"));
     }
 }

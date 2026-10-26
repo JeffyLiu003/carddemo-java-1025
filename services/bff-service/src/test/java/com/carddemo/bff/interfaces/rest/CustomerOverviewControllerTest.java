@@ -5,12 +5,10 @@ import com.carddemo.bff.domain.exception.RemoteServiceException;
 import com.carddemo.bff.domain.model.AccountPosition;
 import com.carddemo.bff.domain.model.CardSummary;
 import com.carddemo.bff.domain.model.CustomerProfile;
-import com.carddemo.bff.domain.model.OfferSummary;
 import com.carddemo.bff.domain.model.RecentTransaction;
 import com.carddemo.bff.infrastructure.client.AccountClient;
 import com.carddemo.bff.infrastructure.client.CardClient;
 import com.carddemo.bff.infrastructure.client.CustomerClient;
-import com.carddemo.bff.infrastructure.client.MarketingClient;
 import com.carddemo.bff.infrastructure.client.TransactionClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,9 +59,6 @@ class CustomerOverviewControllerTest {
     @MockBean
     private TransactionClient transactionClient;
 
-    @MockBean
-    private MarketingClient marketingClient;
-
     private void stubAccount() {
         when(accountClient.creditPosition(ACCOUNT_ID)).thenReturn(new AccountPosition(ACCOUNT_ID, "CLASSIC",
                 new BigDecimal("2020.00"), new BigDecimal("1940.00"), new BigDecimal("0.00"),
@@ -86,18 +81,12 @@ class CustomerOverviewControllerTest {
                         "Purchase at Test Merchant", LocalDateTime.of(2026, 10, 20, 10, 0))));
     }
 
-    private void stubOffers() {
-        when(marketingClient.offers(ACCOUNT_ID, CARD_NUMBER, CUSTOMER_ID)).thenReturn(List.of(
-                new OfferSummary("CAMP001", "开卡首刷礼", true, false)));
-    }
-
     @Test
     void aggregatesFullCustomerOverview() throws Exception {
         stubAccount();
         stubCard();
         stubCustomer();
         stubTransactions();
-        stubOffers();
 
         mockMvc.perform(get("/api/v1/bff/customer-overview").param("accountId", ACCOUNT_ID))
                 .andExpect(status().isOk())
@@ -123,11 +112,6 @@ class CustomerOverviewControllerTest {
                         .value("Purchase at Test Merchant"))
                 .andExpect(jsonPath("$.recentTransactions[0].processedTimestamp")
                         .value("2026-10-20T10:00:00"))
-                .andExpect(jsonPath("$.offers.length()").value(1))
-                .andExpect(jsonPath("$.offers[0].campaignId").value("CAMP001"))
-                .andExpect(jsonPath("$.offers[0].name").value("开卡首刷礼"))
-                .andExpect(jsonPath("$.offers[0].eligible").value(true))
-                .andExpect(jsonPath("$.offers[0].enrolled").value(false))
                 .andExpect(jsonPath("$.degraded.length()").value(0));
     }
 
@@ -155,27 +139,7 @@ class CustomerOverviewControllerTest {
     }
 
     @Test
-    void degradesMarketingWhileKeepingOtherNodes() throws Exception {
-        stubAccount();
-        stubCard();
-        stubCustomer();
-        stubTransactions();
-        when(marketingClient.offers(ACCOUNT_ID, CARD_NUMBER, CUSTOMER_ID))
-                .thenThrow(new RemoteServiceException("marketing-service is unavailable"));
-
-        mockMvc.perform(get("/api/v1/bff/customer-overview").param("accountId", ACCOUNT_ID))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.position.availableCredit").value(80.00))
-                .andExpect(jsonPath("$.cards.length()").value(1))
-                .andExpect(jsonPath("$.customer.customerId").value(CUSTOMER_ID))
-                .andExpect(jsonPath("$.recentTransactions.length()").value(1))
-                .andExpect(jsonPath("$.offers.length()").value(0))
-                .andExpect(jsonPath("$.degraded.length()").value(1))
-                .andExpect(jsonPath("$.degraded[0]").value("marketing-service"));
-    }
-
-    @Test
-    void degradesCardServiceAndDropsCustomerAndOffers() throws Exception {
+    void degradesCardServiceAndDropsCustomer() throws Exception {
         stubAccount();
         when(cardClient.listByAccount(ACCOUNT_ID))
                 .thenThrow(new RemoteServiceException("card-service is unavailable"));
@@ -186,13 +150,11 @@ class CustomerOverviewControllerTest {
                 .andExpect(jsonPath("$.position.productCode").value("CLASSIC"))
                 .andExpect(jsonPath("$.cards.length()").value(0))
                 .andExpect(jsonPath("$.customer").doesNotExist())
-                .andExpect(jsonPath("$.offers.length()").value(0))
                 .andExpect(jsonPath("$.recentTransactions.length()").value(1))
                 .andExpect(jsonPath("$.degraded.length()").value(1))
                 .andExpect(jsonPath("$.degraded[0]").value("card-service"));
 
         verify(customerClient, never()).findById(anyString());
-        verify(marketingClient, never()).offers(anyString(), anyString(), anyString());
     }
 
     @Test
@@ -203,14 +165,12 @@ class CustomerOverviewControllerTest {
                 .thenThrow(new RemoteServiceException("customer-service is unavailable"));
         when(transactionClient.recentByAccount(ACCOUNT_ID, 5))
                 .thenThrow(new RemoteServiceException("transaction-service is unavailable"));
-        when(marketingClient.offers(ACCOUNT_ID, CARD_NUMBER, CUSTOMER_ID)).thenReturn(List.of());
 
         mockMvc.perform(get("/api/v1/bff/customer-overview").param("accountId", ACCOUNT_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.cards.length()").value(1))
                 .andExpect(jsonPath("$.customer").doesNotExist())
                 .andExpect(jsonPath("$.recentTransactions.length()").value(0))
-                .andExpect(jsonPath("$.offers.length()").value(0))
                 .andExpect(jsonPath("$.degraded.length()").value(2))
                 .andExpect(jsonPath("$.degraded[0]").value("customer-service"))
                 .andExpect(jsonPath("$.degraded[1]").value("transaction-service"));
@@ -226,12 +186,10 @@ class CustomerOverviewControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.cards.length()").value(0))
                 .andExpect(jsonPath("$.customer").doesNotExist())
-                .andExpect(jsonPath("$.offers.length()").value(0))
                 .andExpect(jsonPath("$.recentTransactions.length()").value(1))
                 .andExpect(jsonPath("$.degraded.length()").value(0));
 
         verify(customerClient, never()).findById(anyString());
-        verify(marketingClient, never()).offers(anyString(), anyString(), anyString());
     }
 
     @Test
@@ -251,12 +209,10 @@ class CustomerOverviewControllerTest {
         stubCard();
         when(customerClient.findById(CUSTOMER_ID)).thenReturn(Optional.empty());
         when(transactionClient.recentByAccount(ACCOUNT_ID, 5)).thenReturn(List.of());
-        stubOffers();
 
         mockMvc.perform(get("/api/v1/bff/customer-overview").param("accountId", ACCOUNT_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.customer").doesNotExist())
-                .andExpect(jsonPath("$.offers.length()").value(1))
                 .andExpect(jsonPath("$.degraded.length()").value(0));
 
         verify(transactionClient).recentByAccount(ACCOUNT_ID, 5);
@@ -268,13 +224,11 @@ class CustomerOverviewControllerTest {
         stubCard();
         stubCustomer();
         stubTransactions();
-        stubOffers();
 
         mockMvc.perform(get("/api/v1/bff/customer-overview").param("accountId", ACCOUNT_ID))
                 .andExpect(status().isOk());
 
         verify(transactionClient).recentByAccount(ACCOUNT_ID, 5);
-        verify(marketingClient).offers(ACCOUNT_ID, CARD_NUMBER, CUSTOMER_ID);
         verify(accountClient).creditPosition(ACCOUNT_ID);
     }
 }

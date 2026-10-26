@@ -41,7 +41,7 @@ docker compose --profile extended ps
 ```
 
 启动顺序：`postgres`（`pg_isready` 健康检查）→ 无依赖服务 → `transaction` / `authorization` →
-`marketing` / `bff` / `search` / `web-ui`。下游客户端是懒加载的，服务启动不依赖下游可用；
+`bff` / `search` / `web-ui`。下游客户端是懒加载的，服务启动不依赖下游可用；
 调用失败时返回 503。
 
 打开 **http://localhost:8090/** 即为业务界面（登录账号已预填）。
@@ -52,7 +52,7 @@ docker compose --profile extended ps
 ./scripts/smoke-test.sh
 ```
 
-覆盖：默认 13 个健康探针、登录、账户/客户/卡、冻结、过账/总账/对账/EOD、支付/账单/限额/FX、营销。
+覆盖：默认 12 个健康探针、登录、账户/客户/卡、冻结、过账/总账/对账/EOD、支付/账单/限额/FX、BFF/搜索。
 扩展服务（贷款/风险/运营）需先 `--profile extended up -d`，按 `README.md` 页面逐项验证。
 
 手工验证命令见 `README.md` §4。
@@ -112,7 +112,7 @@ DB_HOST=localhost DB_NAME=carddemo_account mvn -f services/account-service/pom.x
 **业务界面（推荐）**：http://localhost:8090/
 - 登录账号已预填：`ADMIN001 / admin123`（管理员）、`USER0001 / user1234`（普通用户）。
 - 功能：账户视图、信用卡查询/维护、交易查询/录入、账单支付、交易报表、授权管理、
-  活动中心/我的奖励、活动管理（管理员）、用户管理（管理员）。
+  总账/对账/EOD、支付/账单、限额、汇率、客户 360、贷款、风险、运营、用户管理（管理员）。
 - 所有 `/api/**` 由 web-ui 同源代理到对应微服务（浏览器无 CORS）。
 
 **API 控制台（Swagger UI）**：每个微服务的根路径重定向到自己的 Swagger UI。
@@ -125,7 +125,6 @@ DB_HOST=localhost DB_NAME=carddemo_account mvn -f services/account-service/pom.x
 | account | http://localhost:8084/ | http://localhost:8084/v3/api-docs |
 | transaction | http://localhost:8085/ | http://localhost:8085/v3/api-docs |
 | authorization | http://localhost:8086/ | http://localhost:8086/v3/api-docs |
-| marketing | http://localhost:8087/ | http://localhost:8087/v3/api-docs |
 | ledger | http://localhost:8088/ | http://localhost:8088/v3/api-docs |
 | reconciliation | http://localhost:8089/ | http://localhost:8089/v3/api-docs |
 | payment | http://localhost:8091/ | http://localhost:8091/v3/api-docs |
@@ -168,14 +167,11 @@ Compose 增加 `ports: ["5005:5005"]`，IDE 以 Remote JVM Debug 连接。
 | `FlywayValidateException: checksum mismatch` | 修改了已执行的迁移脚本 | 演示环境 `docker compose down -v` 重新初始化；生产环境新增迁移版本，禁止改历史脚本 |
 | 端口被占用 | 本机已有服务 | 修改 `docker-compose.yml` 端口映射，或释放端口（5432/8081–8108/8090） |
 | 打开 8080 不是本界面 | 宿主机 8080 已被其他程序占用，本工程映射到 **8090** | 使用 http://localhost:8090/；如需 8080，先释放占用再改 compose 映射 |
-| 活动中心为空 | 活动不是 ACTIVE，或已过活动期 | 用管理员在 `#/campaigns` 发布活动；检查起止时间 |
-| 消费后没有返现 | 未报名、类别/金额不满足、次数或预算用尽 | 在 `#/offers` 查看资格原因；在活动详情看预算使用率 |
-| 奖励显示「待入账」 | account-service 当时不可用 | 在 `#/rewards` 点「重试入账」，接口按 rewardId 幂等 |
 | 账单支付返回 409 `NOTHING_TO_PAY` | 账户余额 ≤ 0 | 换有欠款的账户（种子：1/2/3/4/6/7/8） |
 | 入账返回 `103` 拒付 | 账户到期日早于交易原始日期 | 种子账户 1–5、7 的到期日已过，用账户 6（2027-03-09）或 8（2028-09-30）演示 |
 | 授权返回 `4100` | 可用额度 = 额度 − 当前欠款 − 待授权占用 | 属预期；账户 1 可用额度为 80.00 |
 | 交易号重复 | 入账 `transactionId` 已存在 | 入账按幂等处理（计入 posted + duplicates），换一个新交易号可验证新记账 |
-| 容器内存不足 | 默认 17 容器（16 JVM + PG）；extended 共 29 容器 | 默认 ≥10GB；全开 ≥16GB。8.3GB 实测：默认 17 稳定，扩展建议每批 ≤6 个、验证后停止 |
+| 容器内存不足 | 默认 16 容器（15 JVM + PG）；extended 共 28 容器 | 默认 ≥10GB；全开 ≥16GB。8.3GB 实测：默认 16 稳定，扩展建议每批 ≤6 个、验证后停止 |
 | 服务启动报 `too many clients already` | 服务数 × Hikari 10 > PostgreSQL 默认 100 | Compose 已设置 `max_connections=300`；如自定义 PG，请同步调大 |
 
 ## 6. 数据重置与重建
@@ -199,10 +195,10 @@ docker compose up -d --build
 
 | 项 | 结果 |
 |---|---|
-| `mvn test`（30 模块） | 796 用例全绿 |
-| `mvn verify` | JaCoCo 28 份报告；ArchUnit 2 条规则通过 |
-| `docker compose up -d --build` | 17 个默认容器启动，15 个服务 health=UP |
-| `docker compose --profile extended up -d` | 追加 12 个扩展服务（总 29 容器） |
+| `mvn test`（27 模块） | 762 用例全绿 |
+| `mvn verify` | JaCoCo 报告；ArchUnit 2 条规则通过 |
+| `docker compose up -d --build` | 16 个默认容器启动，15 个服务 health=UP |
+| `docker compose --profile extended up -d` | 追加 12 个扩展服务（总 28 容器） |
 | 冒烟：登录/账户/客户/卡 | 通过 |
 | 冒烟：入账（正常 + 超限 102） | 通过 |
 | 冒烟：授权（批准 50 / 超额 4100 / 汇总占用） | 通过 |
@@ -218,13 +214,12 @@ docker compose up -d --build
 | 扩展：报表、通知、文档、工作流、审计、参考数据 | 通过 |
 | 扩展：BFF 客户 360 与统一搜索 | 通过 |
 | P6：k6 脚本、混沌脚本、JaCoCo、ArchUnit | 已交付/通过 |
-| Swagger UI（27 个服务根路径 302 → `/swagger-ui/index.html`，HTTP 200） | 通过 |
+| Swagger UI（26 个服务根路径 302 → `/swagger-ui/index.html`，HTTP 200） | 通过 |
 | Web 界面（8090 首页 200、静态资源 MIME 正确、同源代理登录/查询/404） | 通过 |
 | 对账/EOD 页面语法与代理路由（`node --check`、`/api/v1/reconciliation-runs`） | 通过 |
 | 支付/账单/限额/FX 页面语法与代理路由（`node --check`、四组前缀） | 通过 |
 | 前端脚本语法（`node --check app.js`） | 通过 |
 | UI 只读端到端（jsdom 驱动真实界面：登录、菜单、账户/卡片/交易/报表/授权/用户、角色权限） | 18/18 通过 |
 | UI 写操作端到端（交易录入、账单支付、卡片维护、用户增删、欺诈标记） | 7/7 通过 |
-| 营销端到端（入账触发返现、报名后二次返现、幂等评估、活动创建/发布） | 通过 |
-| 营销 UI 端到端（活动中心报名、奖励记录、活动新建与发布） | 9/9 通过 |
+| 支付/账单/限额/FX 端到端 | 通过 |
 | 登录请求体预填（`ADMIN001` / `admin123`） | 通过（`/v3/api-docs` 已生成示例） |

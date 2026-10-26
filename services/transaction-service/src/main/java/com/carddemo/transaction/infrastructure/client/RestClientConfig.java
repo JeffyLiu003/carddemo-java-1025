@@ -32,14 +32,6 @@ public class RestClientConfig {
     }
 
     @Bean
-    public RestClient marketingRestClient(RestClient.Builder builder,
-                                          @Value("${client.marketing-service.base-url}") String baseUrl,
-                                          @Value("${client.connect-timeout:3s}") Duration connectTimeout,
-                                          @Value("${client.read-timeout:3s}") Duration readTimeout) {
-        return build(builder, baseUrl, connectTimeout, readTimeout);
-    }
-
-    @Bean
     public RestClient ledgerRestClient(RestClient.Builder builder,
                                        @Value("${client.ledger-service.base-url:http://localhost:8088}") String baseUrl,
                                        @Value("${client.connect-timeout:3s}") Duration connectTimeout,

@@ -2,7 +2,7 @@
 
 把 AWS CardDemo（CICS/COBOL 信用卡核心演示系统）迁移为基于 **DDD 限界上下文**的 Java 微服务工程。
 本项目不是逐行翻译 COBOL，而是：先提取存量业务知识（L1–L5 五层模型 + 业务规则目录），
-再按领域边界划分 27 个微服务（6 个既有业务域 + 营销、总账、对账、支付、账单、限额、汇率、信贷、风险、运营、渠道），最后用 Spring Boot 3 落地，并提供面向业务人员的 Web 界面与
+再按领域边界划分 26 个微服务（6 个既有业务域 + 总账、对账、支付、账单、限额、汇率、信贷、风险、运营、渠道），最后用 Spring Boot 3 落地，并提供面向业务人员的 Web 界面与
 Docker Compose 调试运行能力。
 
 ## 1. 架构总览
@@ -21,7 +21,6 @@ graph LR
     subgraph 支撑/通用域
       CUST[customer-service :8082<br/>客户主数据]
       IAM[iam-service :8081<br/>登录/用户]
-      MKT[marketing-service :8087<br/>活动/报名/返现/积分]
       RECON[reconciliation-service :8089<br/>对账/差异处理/EOD]
       BILL[billing-service :8092<br/>账单/利息/最低还款]
       LIMIT[limit-service :8093<br/>限额/用量]
@@ -32,7 +31,7 @@ graph LR
       BFF[bff-service :8107<br/>客户 360 聚合]
       SEARCH[search-service :8108<br/>统一搜索]
     end
-    DB[(PostgreSQL 16<br/>25 个独立 database)]
+    DB[(PostgreSQL 16<br/>24 个独立 database)]
 
     WEB -. /api/** 代理 .-> IAM
     WEB -.-> CUST
@@ -40,7 +39,6 @@ graph LR
     WEB -.-> ACCT
     WEB -.-> TXN
     WEB -.-> AUTH
-    WEB -.-> MKT
     WEB -.-> LEDGER
     WEB -.-> RECON
     WEB -.-> PAY
@@ -55,7 +53,6 @@ graph LR
     ACCT --> AUTH
     CUST -.-> AUTH
     IAM -. token 契约（POC 未强制） .-> TXN
-    TXN -. 入账后奖励评估 .-> MKT
     TXN -. 过账后同步日记账 .-> LEDGER
     RECON -. 读取批次/日记账 .-> TXN
     RECON -. 读取日记账/试算平衡 .-> LEDGER
@@ -67,7 +64,6 @@ graph LR
     BFF -. 聚合 .-> TXN
     SEARCH -. 查询 .-> CUST
     SEARCH -. 查询 .-> TXN
-    MKT --> ACCT
     TXN --> DB
     LEDGER --> DB
     RECON --> DB
@@ -115,15 +111,14 @@ graph LR
 | bff-service | 8107 | —（无状态） | **新增能力**：客户 360 聚合 |
 | search-service | 8108 | —（无状态） | **新增能力**：客户/交易统一搜索 |
 | authorization-service | 8086 | `carddemo_authorization` | COPAUA0C、COPAUS0C/1C/2C、CBPAUP0C、IMS PAUTSUM0/PAUTDTL1、DB2 AUTHFRDS |
-| marketing-service | 8087 | `carddemo_marketing` | **新增能力**（存量无营销）：活动、报名、返现/积分、活动效果 |
 
 ## 2. 目录结构
 
 ```
 carddemo-java-1025/
 ├── pom.xml                      # Maven 聚合父 POM（Spring Boot 3.3.6 / Java 21）
-├── docker-compose.yml           # PostgreSQL + 15 个默认微服务 + Web 界面；extended profile 追加 12 个
-├── docker/postgres/init/        # 25 个 database 初始化
+├── docker-compose.yml           # PostgreSQL + 14 个默认微服务 + Web 界面；extended profile 追加 12 个
+├── docker/postgres/init/        # 24 个 database 初始化
 ├── scripts/build-and-up.sh      # 打包 + 构建镜像 + 启动
 ├── scripts/smoke-test.sh        # 端到端冒烟测试
 ├── docs/
@@ -157,7 +152,6 @@ carddemo-java-1025/
     ├── bff-service/              # 客户 360 聚合（新增）
     ├── search-service/           # 统一搜索（新增）
     ├── authorization-service/
-    ├── marketing-service/       # 营销：活动/报名/奖励/效果（新增）
     └── web-ui/                  # 业务界面（静态 SPA）+ 同源 API 代理
 ```
 
@@ -179,7 +173,7 @@ src/main/java/com/carddemo/<context>/
 cd carddemo-java-1025
 ./scripts/build-and-up.sh          # mvn package + docker compose up -d --build
 docker compose ps
-./scripts/smoke-test.sh            # 端到端验证（健康、查询、过账、冻结、授权、报表、营销）
+./scripts/smoke-test.sh            # 端到端验证（健康、查询、过账、冻结、授权、报表、支付、对账、BFF）
 ```
 
 打开 **http://localhost:8090/** 即为业务界面（登录账号已预填，直接登录）。
@@ -192,7 +186,7 @@ docker compose ps
 全部单元/集成测试：
 
 ```bash
-mvn test        # 796 个用例，H2 + Flyway，多模块并行
+mvn test        # 762 个用例，H2 + Flyway，多模块并行
 ```
 
 ## 3.1 Web 界面（推荐）
@@ -221,9 +215,6 @@ mvn test        # 796 个用例，H2 + Flyway，多模块并行
 | 账单支付 | 查询欠款 → 确认 → 全额还款并回显新余额 | COBIL00C |
 | 交易报表 | 日期区间统计、区间合计、按卡合计 | CORPT00C / CBTRN03C |
 | 授权管理 | 待授权汇总、明细、标记欺诈、过期清理 | COPAUS0C/1C/2C、CBPAUP0C |
-| 活动中心 | 查看可参与活动、资格原因、报名（营销新增） | 新增能力 |
-| 我的奖励 | 返现/积分记录、状态、待入账重试（营销新增） | 新增能力 |
-| 活动管理 | 新建、编辑草稿、发布/暂停/结束、效果指标（管理员） | 新增能力 |
 | 用户管理 | 列表、新增、编辑、删除（仅管理员） | COUSR00C–03C |
 
 | 演示账号 | 密码 | 类型 |
@@ -331,8 +322,6 @@ curl -s -X POST localhost:8089/api/v1/eod-runs \
 - **乐观锁替代记录锁**：`@Version` 替代 `READ UPDATE` + 快照比对，冲突返回 409。见 ADR-006。
 - **缺陷修复**（均有记录与测试）：CVV 不被卡维护覆盖、过期授权清理回退信用余额、
   可用额度同时扣减账户欠款与授权占用、密码 PBKDF2 存储。见规则目录中的 `NR-*`。
-- **营销能力（新增）**：活动/报名/奖励独立成上下文；入账成功后同步评估奖励，失败只告警不回滚账务；
-  返现由 account-service 以 `rewardId` 幂等入账，待入账可重试。见 `docs/design/08-marketing-capability.md` 与 ADR-009。
 - **过账与总账（新增）**：过账批次按类型规则生成借贷分录，账户余额变更与分录同事务、总账同步尽力而为；
   冲正生成反向批次并保留原记录；总账按 `(sourceType, sourceId)` 幂等，试算平衡与期间关账可查。
   见 `docs/design/11-money-path-slice-a2.md`。
@@ -348,10 +337,9 @@ curl -s -X POST localhost:8089/api/v1/eod-runs \
 | [docs/README.md](docs/README.md) | 全部文档索引 |
 | [docs/legacy/02-five-level-model.md](docs/legacy/02-five-level-model.md) | L1–L5 业务模型（带证据） |
 | [docs/legacy/03-business-rule-catalog.md](docs/legacy/03-business-rule-catalog.md) | 业务规则 → 实现落点 → 状态 |
-| [docs/design/02-bounded-contexts.md](docs/design/02-bounded-contexts.md) | 27 个限界上下文 |
+| [docs/design/02-bounded-contexts.md](docs/design/02-bounded-contexts.md) | 26 个限界上下文 |
 | [docs/design/05-api-catalog.md](docs/design/05-api-catalog.md) | 全部 API 契约与种子数据 |
-| [docs/design/06-traceability-matrix.md](docs/design/06-traceability-matrix.md) | 44 个遗留程序的去向（营销/总账/对账/支付/账单为新增能力） |
-| [docs/design/08-marketing-capability.md](docs/design/08-marketing-capability.md) | 营销场景、领域模型、积分/返现规则与前后台改造 |
+| [docs/design/06-traceability-matrix.md](docs/design/06-traceability-matrix.md) | 44 个遗留程序的去向（总账/对账/支付/账单为新增能力） |
 | [docs/design/09-scale-up-blueprint.md](docs/design/09-scale-up-blueprint.md) | 规模化蓝图与分阶段路线图 |
 | [docs/design/10-money-path-slice-a1.md](docs/design/10-money-path-slice-a1.md) | A1：账户产品化、冻结、可用额度 |
 | [docs/design/11-money-path-slice-a2.md](docs/design/11-money-path-slice-a2.md) | A2：过账引擎、总账、试算平衡与前台 |
@@ -360,7 +348,7 @@ curl -s -X POST localhost:8089/api/v1/eod-runs \
 | [docs/design/14-risk-credit-collections.md](docs/design/14-risk-credit-collections.md) | P3：信贷、欺诈、AML、争议、催收、批处理 |
 | [docs/design/15-operations-support.md](docs/design/15-operations-support.md) | P4：报表、通知、文档、工作流、审计、参考数据 |
 | [docs/design/16-channel-and-quality.md](docs/design/16-channel-and-quality.md) | P5/P6：BFF、搜索、门户、性能、混沌与安全 |
-| [docs/design/adr/README.md](docs/design/adr/README.md) | 12 个架构决策 |
+| [docs/design/adr/README.md](docs/design/adr/README.md) | 11 个架构决策 |
 | [docs/ops/01-docker-runbook.md](docs/ops/01-docker-runbook.md) | Docker 调试运行手册 |
 
 ## 7. 已知限制（POC 范围）
@@ -371,17 +359,15 @@ curl -s -X POST localhost:8089/api/v1/eod-runs \
 3. **报表只迁移数据口径**，不迁移 133 字节打印排版；对账单/分行迁移/MQ 适配器为延后项。
 4. **种子数据为归一化样例**：遗留 ASCII 数据存在 EBCDIC 过穿孔字符，真实迁移须按数据字典解码。
 5. 单账户并发授权使用乐观锁，热点账户需重试；压测与分区方案待补（未解决项 U1）。
-6. **营销为新增能力**：入账后同步评估（最坏 +2s，营销不可用不影响入账）；预算并发极端情况下可能超发 1 笔；
-   积分仅记录、暂不支持兑换；活动叠加策略需业务确认（`08-marketing-capability.md` §8）。
-7. **总账为新增能力**：过账后同步调用总账，失败只告警（`ledgerEntryId` 为空），尚无 Outbox 重试；
+6. **总账为新增能力**：过账后同步调用总账，失败只告警（`ledgerEntryId` 为空），尚无 Outbox 重试；
    试算平衡按发生额汇总，不包含期初余额；期间关账暂不支持反关账。
-8. **对账为新增能力**：当前只做“过账批次 ↔ 总账日记账”与试算平衡检查；账户余额 vs 总账 1100
+7. **对账为新增能力**：当前只做“过账批次 ↔ 总账日记账”与试算平衡检查；账户余额 vs 总账 1100
    需要按账户的子账映射（未实现）。EOD 目前只编排对账，计息/账单/总账结转待扩展。
-9. **支付为演示级**：无真实 ISO 20022/SWIFT/ACH 报文、清算网络与 cut-off；制裁筛查为硬编码名单。
-10. **账单/限额/FX 为演示级**：账单基于当前账户快照生成，无历史周期、滞纳金与分期；
-    限额尚未接入授权链路；FX 仅支持直接货币对，无三角套算与敞口管理。
-11. **P3/P4/P5 为演示级**：贷款/欺诈/AML/争议/催收为单聚合状态机；批处理同步调用、无调度器；
+8. **支付为演示级**：无真实 ISO 20022/SWIFT/ACH 报文、清算网络与 cut-off；制裁筛查为硬编码名单。
+9. **账单/限额/FX 为演示级**：账单基于当前账户快照生成，无历史周期、滞纳金与分期；
+   限额尚未接入授权链路；FX 仅支持直接货币对，无三角套算与敞口管理。
+10. **P3/P4/P5 为演示级**：贷款/欺诈/AML/争议/催收为单聚合状态机；批处理同步调用、无调度器；
     报表/通知/文档/工作流/审计/参考数据为轻量实现；搜索为实时过滤，无 OpenSearch 索引；
     BFF 串行聚合，未做并行/缓存。
-12. **扩展服务默认不启动**：为控制内存，P3/P4 的 12 个服务放在 Compose `extended` profile，
-    使用 `docker compose --profile extended up -d` 启动；默认运行 17 个容器。
+11. **扩展服务默认不启动**：为控制内存，P3/P4 的 12 个服务放在 Compose `extended` profile，
+    使用 `docker compose --profile extended up -d` 启动；默认运行 16 个容器。

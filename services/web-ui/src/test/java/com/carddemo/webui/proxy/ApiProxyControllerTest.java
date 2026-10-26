@@ -11,7 +11,7 @@ class ApiProxyControllerTest {
     private final ApiProxyController controller = new ApiProxyController(
             "http://iam:8081", "http://customer:8082", "http://card:8083",
             "http://account:8084", "http://transaction:8085", "http://authorization:8086",
-            "http://marketing:8087", "http://ledger:8088", "http://reconciliation:8089",
+            "http://ledger:8088", "http://reconciliation:8089",
             "http://payment:8091", "http://billing:8092", "http://limit:8093", "http://fx:8094",
             "http://bff:8107", "http://search:8108", "http://loan:8095", "http://fraud:8096",
             "http://aml:8097", "http://dispute:8098", "http://collections:8099", "http://batch:8100",
@@ -36,11 +36,6 @@ class ApiProxyControllerTest {
                 .isEqualTo("http://authorization:8086");
         assertThat(controller.resolveTarget("/api/v1/authorization-purges"))
                 .isEqualTo("http://authorization:8086");
-        assertThat(controller.resolveTarget("/api/v1/campaigns/c1")).isEqualTo("http://marketing:8087");
-        assertThat(controller.resolveTarget("/api/v1/eligibilities")).isEqualTo("http://marketing:8087");
-        assertThat(controller.resolveTarget("/api/v1/reward-evaluations")).isEqualTo("http://marketing:8087");
-        assertThat(controller.resolveTarget("/api/v1/rewards/r1/fulfill")).isEqualTo("http://marketing:8087");
-        assertThat(controller.resolveTarget("/api/v1/marketing/summary")).isEqualTo("http://marketing:8087");
         assertThat(controller.resolveTarget("/api/v1/posting-types")).isEqualTo("http://transaction:8085");
         assertThat(controller.resolveTarget("/api/v1/posting-types/CARD_PURCHASE"))
                 .isEqualTo("http://transaction:8085");

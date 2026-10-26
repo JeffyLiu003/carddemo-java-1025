@@ -120,18 +120,6 @@ public class Account {
     }
 
     /**
-     * NR-REWARD-01：营销返现入账，直接冲减欠款；余额可为负（表示溢缴/贷记）。
-     * 幂等由调用方以 rewardId 保证（见 account_service.reward_credit）。
-     */
-    public void applyCashback(BigDecimal amount) {
-        if (amount == null || amount.signum() <= 0) {
-            throw new BusinessRuleException("INVALID_CASHBACK_AMOUNT",
-                    "Cashback amount must be greater than zero.");
-        }
-        currentBalance = currentBalance.subtract(amount);
-    }
-
-    /**
      * AH-03/AH-07：可用额度 = 额度 - 当前欠款 - 未过期冻结合计。
      */
     public BigDecimal availableCredit(BigDecimal activeHoldAmount) {

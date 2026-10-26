@@ -23,4 +23,3 @@ CREATE DATABASE carddemo_workflow;
 CREATE DATABASE carddemo_audit;
 CREATE DATABASE carddemo_reference;
 CREATE DATABASE carddemo_authorization;
-CREATE DATABASE carddemo_marketing;

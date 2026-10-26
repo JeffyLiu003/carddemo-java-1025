@@ -9,9 +9,6 @@
 | Card | Authorization | 客户-供应商 | 同步 REST | 授权需要卡状态与账户号 |
 | Account | Authorization | 客户-供应商 | 同步 REST | 授权读取额度/余额快照，不写账户 |
 | Customer | Authorization | 遵从者（Conformist） | 同步 REST | 仅校验客户存在；授权不修改客户 |
-| Transaction | Marketing | 客户-供应商 | 同步 REST `POST /reward-evaluations` | 入账后触发奖励评估；营销失败不影响入账 |
-| Account | Marketing | 客户-供应商 | 同步 REST `GET /accounts/{id}` | 营销读取账户组/状态判断资格 |
-| Marketing | Account | 客户-供应商 | 同步 REST `POST /accounts/{id}/cashback-credits` | 返现由账户上下文执行，rewardId 幂等 |
 | IAM | 全部服务 | 共享内核（仅 token 契约） | HTTP Header（规划） | POC 阶段不强制校验（ADR-007） |
 | 遗留 COBOL 系统 | 新系统 | 防腐层（ACL，双跑期） | 文件/批量对账 | 迁移期数据由迁移工具转换，新系统不直接读 VSAM |
 | Reporting（Transaction 内的子模块） | 调用方 | 开放主机服务（OHS） | REST 报表 API | 只读，不反向影响写模型 |
@@ -26,16 +23,12 @@ graph LR
     ACCT[account-service<br/>核心域]
     TXN[transaction-service<br/>核心域]
     AUTH[authorization-service<br/>核心域]
-    MKT[marketing-service<br/>支撑域（新增）]
 
     CARD -- "客户-供应商：卡→账户/客户映射" --> TXN
     ACCT -- "客户-供应商：余额/额度记账" --> TXN
     CARD -- "客户-供应商：卡状态" --> AUTH
     ACCT -- "客户-供应商：额度/余额快照" --> AUTH
     CUST -. "遵从者：客户存在性" .-> AUTH
-    TXN -- "客户-供应商：入账后奖励评估" --> MKT
-    ACCT -- "客户-供应商：账户快照" --> MKT
-    MKT -- "客户-供应商：返现入账（幂等）" --> ACCT
     IAM -. "共享内核：token 契约（POC 未强制）" .-> TXN
 
     LEGACY[(遗留 COBOL<br/>VSAM/IMS/DB2)] -. "ACL：迁移与对账（双跑期）" .-> ACCT

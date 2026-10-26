@@ -17,7 +17,7 @@
 多币种：本期由 fx-service（报价/换汇）+ reference-data（币种）提供定价能力；
 账户级多币种余额与多实体核算留待后续（见 §6）。
 
-## 2. bff-service
+## 2. BFF 聚合
 
 ### 2.1 API
 
@@ -34,14 +34,13 @@
  "cards":[{"cardNumber":"0500024453765740","customerId":"000000001","activeStatus":"Y"}],
  "customer":{"customerId":"000000001","firstName":"Immanuel","lastName":"Kessler"},
  "recentTransactions":[{"transactionId":"...","amount":50.47,"description":"..."}],
- "offers":[{"campaignId":"...","name":"开卡首刷礼","eligible":true,"enrolled":false}],
  "degraded":[]}
 ```
 
 聚合规则：
 
 - Account `/credit-position` 失败 → 404（账户不存在）或 503；
-- Card/Customer/Transaction/Marketing 失败 → 对应节点为空，`degraded` 记录服务名；不影响整体 200；
+- Card/Customer/Transaction 失败 → 对应节点为空，`degraded` 记录服务名；不影响整体 200；
 - 超时 2s；客户从第一张卡解析 customerId。
 
 ## 3. search-service
@@ -76,7 +75,7 @@
 ## 5. P6 交付物
 
 1. **性能**：`scripts/perf/k6-smoke.js`，覆盖登录、账户、过账、对账查询；阈值 p95 < 800ms、错误率 < 1%。
-2. **混沌/降级**：`scripts/chaos-test.sh` 停止 marketing，验证交易入账仍成功且奖励降级；恢复后验证。
+2. **混沌/降级**：`scripts/chaos-test.sh` 停止 ledger，验证过账仍成功且 `ledgerEntryId` 为空；恢复后冲正。
 3. **安全**：`docs/ops/02-security-and-performance.md` 记录 OWASP 核对、依赖扫描命令、NFR 指标。
 4. **覆盖率**：父 POM 增加 JaCoCo（`mvn verify` 生成报告，不设硬门槛，避免演示环境阻塞）。
 5. **架构约束**：在 account-service 增加 ArchUnit 测试，校验 domain 不依赖 infrastructure/interfaces。
@@ -95,6 +94,6 @@
 1. BFF 聚合返回账户/卡片/客户/交易/权益；单一下游失败只降级不整体失败。
 2. 搜索按客户/交易类型返回结果；非法 type 400。
 3. 四个新页面可操作核心链路；导航/代理正确。
-4. k6 脚本可执行；chaos 脚本可停止/恢复 marketing。
+4. k6 脚本可执行；chaos 脚本可停止/恢复 ledger。
 5. `mvn verify` 生成 JaCoCo 报告；ArchUnit 通过。
-6. 默认 Compose 17 个容器（核心 15 + BFF + 搜索）；`--profile extended` 追加 12 个扩展服务。
+6. 默认 Compose 16 个容器（核心 14 + BFF + 搜索）；`--profile extended` 追加 12 个扩展服务。

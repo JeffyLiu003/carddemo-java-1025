@@ -9,10 +9,10 @@
 | JDK | 21 |
 | 框架 | Spring Boot 3.3.6（Web / Data JPA / Validation / Actuator） |
 | 构建 | Maven 多模块，父 POM `com.carddemo:carddemo-java:1.0.0-SNAPSHOT` |
-| 数据库 | PostgreSQL 16（Docker）/ H2（单元测试、`local` profile），每个服务一个 database（含 `carddemo_marketing`） |
+| 数据库 | PostgreSQL 16（Docker）/ H2（单元测试、`local` profile），每个服务一个 database |
 | 迁移 | Flyway，脚本位于 `src/main/resources/db/migration` |
 | 测试 | JUnit 5 + AssertJ + MockMvc + H2 |
-| 端口 | iam 8081 / customer 8082 / card 8083 / account 8084 / transaction 8085 / authorization 8086 / marketing 8087 / web-ui 8090 |
+| 端口 | iam 8081 / customer 8082 / card 8083 / account 8084 / transaction 8085 / authorization 8086 / ledger 8088 / web-ui 8090 |
 
 ## 2. 包结构与分层
 

@@ -5,10 +5,8 @@ import com.carddemo.account.domain.exception.NotFoundException;
 import com.carddemo.account.domain.model.Account;
 import com.carddemo.account.domain.model.AccountDetails;
 import com.carddemo.account.domain.model.AccountProduct;
-import com.carddemo.account.domain.model.RewardCredit;
 import com.carddemo.account.domain.repository.AccountProductRepository;
 import com.carddemo.account.domain.repository.AccountRepository;
-import com.carddemo.account.domain.repository.RewardCreditRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,13 +23,10 @@ import java.util.List;
 public class AccountApplicationService {
 
     private final AccountRepository accounts;
-    private final RewardCreditRepository rewardCredits;
     private final AccountProductRepository products;
 
-    public AccountApplicationService(AccountRepository accounts, RewardCreditRepository rewardCredits,
-                                     AccountProductRepository products) {
+    public AccountApplicationService(AccountRepository accounts, AccountProductRepository products) {
         this.accounts = accounts;
-        this.rewardCredits = rewardCredits;
         this.products = products;
     }
 
@@ -86,20 +81,5 @@ public class AccountApplicationService {
         Account account = getById(accountId);
         account.accrueInterest(amount);
         return accounts.saveAccount(account);
-    }
-
-    /**
-     * 营销返现入账（幂等）：同一 rewardId 重复调用只入账一次。
-     */
-    public Account creditCashback(String accountId, String rewardId, String campaignId, BigDecimal amount) {
-        if (rewardCredits.existsByRewardId(rewardId)) {
-            return getById(accountId);
-        }
-        Account account = getById(accountId);
-        account.applyCashback(amount);
-        Account saved = accounts.saveAccount(account);
-        rewardCredits.saveCredit(new RewardCredit(rewardId, accountId, campaignId, amount,
-                LocalDateTime.now()));
-        return saved;
     }
 }

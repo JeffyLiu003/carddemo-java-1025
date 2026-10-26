@@ -17,8 +17,6 @@ client:
     base-url: ${CUSTOMER_SERVICE_URL:http://localhost:8082}
   transaction-service:
     base-url: ${TRANSACTION_SERVICE_URL:http://localhost:8085}
-  marketing-service:
-    base-url: ${MARKETING_SERVICE_URL:http://localhost:8087}
 
 management:
   endpoints:

@@ -18,7 +18,6 @@ public record CustomerOverviewResponse(
         List<Card> cards,
         Customer customer,
         List<Transaction> recentTransactions,
-        List<Offer> offers,
         List<String> degraded) {
 
     public static CustomerOverviewResponse from(CustomerOverview overview) {
@@ -28,7 +27,6 @@ public record CustomerOverviewResponse(
                 overview.cards().stream().map(Card::from).toList(),
                 overview.customer() == null ? null : Customer.from(overview.customer()),
                 overview.recentTransactions().stream().map(Transaction::from).toList(),
-                overview.offers().stream().map(Offer::from).toList(),
                 overview.degraded());
     }
 
@@ -81,17 +79,6 @@ public record CustomerOverviewResponse(
         static Transaction from(com.carddemo.bff.domain.model.RecentTransaction transaction) {
             return new Transaction(transaction.transactionId(), transaction.amount(),
                     transaction.description(), transaction.processedTimestamp());
-        }
-    }
-
-    public record Offer(
-            String campaignId,
-            String name,
-            boolean eligible,
-            boolean enrolled) {
-
-        static Offer from(com.carddemo.bff.domain.model.OfferSummary offer) {
-            return new Offer(offer.campaignId(), offer.name(), offer.eligible(), offer.enrolled());
         }
     }
 }

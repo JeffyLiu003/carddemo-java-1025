@@ -5,12 +5,10 @@ import com.carddemo.bff.domain.model.AccountPosition;
 import com.carddemo.bff.domain.model.CardSummary;
 import com.carddemo.bff.domain.model.CustomerOverview;
 import com.carddemo.bff.domain.model.CustomerProfile;
-import com.carddemo.bff.domain.model.OfferSummary;
 import com.carddemo.bff.domain.model.RecentTransaction;
 import com.carddemo.bff.infrastructure.client.AccountClient;
 import com.carddemo.bff.infrastructure.client.CardClient;
 import com.carddemo.bff.infrastructure.client.CustomerClient;
-import com.carddemo.bff.infrastructure.client.MarketingClient;
 import com.carddemo.bff.infrastructure.client.TransactionClient;
 import org.springframework.stereotype.Service;
 
@@ -32,7 +30,6 @@ public class CustomerOverviewService {
     private static final String CARD_SERVICE = "card-service";
     private static final String CUSTOMER_SERVICE = "customer-service";
     private static final String TRANSACTION_SERVICE = "transaction-service";
-    private static final String MARKETING_SERVICE = "marketing-service";
 
     private static final int RECENT_TRANSACTION_SIZE = 5;
 
@@ -40,15 +37,13 @@ public class CustomerOverviewService {
     private final CardClient cards;
     private final CustomerClient customers;
     private final TransactionClient transactions;
-    private final MarketingClient marketing;
 
     public CustomerOverviewService(AccountClient accounts, CardClient cards, CustomerClient customers,
-                                   TransactionClient transactions, MarketingClient marketing) {
+                                   TransactionClient transactions) {
         this.accounts = accounts;
         this.cards = cards;
         this.customers = customers;
         this.transactions = transactions;
-        this.marketing = marketing;
     }
 
     public CustomerOverview overview(String accountId) {
@@ -61,10 +56,9 @@ public class CustomerOverviewService {
         CustomerProfile customer = loadCustomer(customerId, degraded);
         List<RecentTransaction> recentTransactions = degrade(TRANSACTION_SERVICE, degraded,
                 () -> transactions.recentByAccount(accountId, RECENT_TRANSACTION_SIZE), List.of());
-        List<OfferSummary> offers = loadOffers(accountId, accountCards, customerId, degraded);
 
         return new CustomerOverview(accountId, position, accountCards, customer,
-                recentTransactions, offers, List.copyOf(degraded));
+                recentTransactions, List.copyOf(degraded));
     }
 
     private CustomerProfile loadCustomer(String customerId, List<String> degraded) {
@@ -76,20 +70,6 @@ public class CustomerOverviewService {
         } catch (RemoteServiceException ex) {
             degraded.add(CUSTOMER_SERVICE);
             return null;
-        }
-    }
-
-    private List<OfferSummary> loadOffers(String accountId, List<CardSummary> accountCards,
-                                          String customerId, List<String> degraded) {
-        if (accountCards.isEmpty()) {
-            return List.of();
-        }
-        String cardNumber = accountCards.get(0).cardNumber();
-        try {
-            return marketing.offers(accountId, cardNumber, customerId);
-        } catch (RemoteServiceException ex) {
-            degraded.add(MARKETING_SERVICE);
-            return List.of();
         }
     }
 

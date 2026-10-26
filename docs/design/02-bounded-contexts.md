@@ -9,7 +9,7 @@
 | 身份与访问（IAM） | 通用域 | iam-service :8081 | `carddemo_iam` | SecUser |
 | 客户（Customer） | 支撑域 | customer-service :8082 | `carddemo_customer` | Customer |
 | 卡片（Card） | 核心域 | card-service :8083 | `carddemo_card` | Card、CardXref |
-| 账户（Account） | 核心域 | account-service :8084 | `carddemo_account` | Account、AccountProduct、AccountHold、RewardCredit |
+| 账户（Account） | 核心域 | account-service :8084 | `carddemo_account` | Account、AccountProduct、AccountHold |
 | 交易与账务（Transaction） | 核心域 | transaction-service :8085 | `carddemo_transaction` | TransactionRecord、TranCategoryBalance、TranType、TranCategory、DisclosureGroup、PostingBatch |
 | 总账（Ledger） | 核心域（新增） | ledger-service :8088 | `carddemo_ledger` | LedgerAccount、JournalEntry、AccountingPeriod |
 | 对账（Reconciliation） | 支撑域（新增） | reconciliation-service :8089 | `carddemo_reconciliation` | ReconciliationRun、ReconciliationItem、EodRun |
@@ -32,7 +32,6 @@
 | BFF | 表现层（新增） | bff-service :8107 | —（无状态） | CustomerOverview |
 | 搜索（Search） | 支撑域（新增） | search-service :8108 | —（无状态） | SearchResult |
 | 授权（Authorization） | 核心域 | authorization-service :8086 | `carddemo_authorization` | AuthorizationCase、PendingAuthorizationSummary、CardFraudFlag |
-| 营销（Marketing） | 支撑域（新增） | marketing-service :8087 | `carddemo_marketing` | Campaign、Enrollment、RewardGrant |
 
 ## 2. 各上下文职责与边界
 
@@ -89,19 +88,7 @@
 - **不属于**：账户余额与额度（只读取快照）、交易入账（授权批准不等于入账）、客户资料。
 - **遗留映射**：COPAUA0C、COPAUS0C/1C/2C、CBPAUP0C、IMS PAUTSUM0/PAUTDTL1、DB2 AUTHFRDS。
 
-### 2.7 Marketing（marketing-service，新增）
-
-- **职责**：活动配置与生命周期、报名、消费奖励评估（返现/积分）、奖励发放与重试、活动效果统计。
-- **聚合**：`Campaign`（活动，状态机 DRAFT→ACTIVE⇄PAUSED→ENDED）、`Enrollment`（报名）、
-  `RewardGrant`（奖励发放，幂等键 campaignId+transactionId）。
-- **不变量**：见 `08-marketing-capability.md` §2 与 MK-* 规则；预算不可超发；同一交易同一活动只发一次。
-- **对外契约**：`/api/v1/campaigns`、`/api/v1/eligibilities`、`/api/v1/reward-evaluations`、
-  `/api/v1/rewards`、`/api/v1/marketing/summary`。
-- **不属于**：账户余额（只读快照，返现由 Account 执行）、交易账本、卡片状态、客户资料。
-- **集成**：Transaction 入账成功后同步调用评估（失败只告警）；返现调 Account 幂等入账。见 ADR-009。
-- **遗留映射**：无（存量系统不具备营销能力）。
-
-### 2.8 Ledger（ledger-service，新增）
+### 2.7 Ledger（ledger-service，新增）
 
 - **职责**：科目表、复式日记账、冲正、试算平衡、会计期间关账。
 - **聚合**：`LedgerAccount`（科目）、`JournalEntry`（日记账，含 `JournalLine`）、`AccountingPeriod`（期间）。
@@ -111,7 +98,7 @@
 - **不属于**：账户余额（Account 权威）、业务交易语义（Transaction 权威）、客户/卡状态。
 - **集成**：Transaction 过账成功后同步记日记账（失败只告警）；冲正由两侧各自生成反向记录。
 
-### 2.9 Reconciliation（reconciliation-service，新增）
+### 2.8 Reconciliation（reconciliation-service，新增）
 
 - **职责**：按业务日期对账过账批次与 `POSTING_BATCH` 日记账，校验试算平衡，记录差异与处理说明，提供 EOD 作业入口。
 - **聚合**：`ReconciliationRun`（运行）、`ReconciliationItem`（差异明细）、`EodRun`（作业运行）。
@@ -120,32 +107,32 @@
 - **不属于**：账户余额、过账规则、日记账写入（分别归 Account/Transaction/Ledger）。
 - **集成**：读取 transaction 批次、ledger 日记账与试算平衡；不反向修改两者。
 
-### 2.10 Payment（payment-service，新增）
+### 2.9 Payment（payment-service，新增）
 
 - **职责**：支付指令受理、收款人筛查、接受、清算（调用 transaction 过账）、退汇（冲正）。
 - **聚合**：`PaymentOrder`，状态 RECEIVED→SCREENED→ACCEPTED→SETTLED，RETURNED/REJECTED 终态。
 - **不变量**：金额 > 0；币种/类型合法；状态迁移单向；`idempotencyKey` 唯一；清算幂等键 `payment:<id>`。
 - **集成**：Account 校验账户；Transaction 落过账批次与冲正；不直接改余额。
 
-### 2.11 Billing（billing-service，新增）
+### 2.10 Billing（billing-service，新增）
 
 - **职责**：按账户+期间生成账单，计算期初/期末、消费/还款、利息、最低还款、到期日，支持全额支付。
 - **聚合**：`Statement`，唯一 `(accountId, period)`；状态 GENERATED/PAID/OVERDUE。
 - **集成**：Account 读取账户/产品/周期累计并执行还款。
 
-### 2.12 Limit（limit-service，新增）
+### 2.11 Limit（limit-service，新增）
 
 - **职责**：客户/账户/渠道的产品限额定义、占用/释放与可用性检查。
 - **聚合**：`LimitDefinition`；不变量 amount>0、used≤amount、唯一 `(scopeType, scopeId, limitType, currency)`。
 - **边界**：本期独立，授权链路接入为后续。
 
-### 2.13 FX（fx-service，新增）
+### 2.12 FX（fx-service，新增）
 
 - **职责**：直接货币对汇率维护、5 分钟报价、单次消费换汇。
 - **聚合**：`FxRate`、`FxQuote`、`FxConversion`；报价过期/重复消费拒绝。
 - **边界**：仅直接货币对，无三角套算与敞口管理。
 
-### 2.14 P3/P4/P5 扩展上下文（新增）
+### 2.13 P3/P4/P5 扩展上下文（新增）
 
 | 上下文 | 核心职责 | 关键不变量 |
 |---|---|---|
@@ -173,8 +160,6 @@
 | 账单支付 | Transaction | Account、Card | 读余额；写交易；扣款 |
 | 利息 | Transaction | Account | 写利息交易；余额与账期结算 |
 | 授权决策 | Authorization | Card、Account、Customer | 读卡/账户/客户快照；写本地授权汇总 |
-| 奖励评估 | Transaction → Marketing | Account | 入账后传交易快照；Marketing 读账户组并把返现写回 Account |
-| 活动中心/奖励 | Web UI → Marketing | Account | 读账户快照判断资格；读本地报名与奖励 |
 | 过账 | Transaction | Account、Ledger | 账户余额变更；批次与分录落库；总账同步 |
 | 总账查询/关账 | Web UI → Ledger | — | 只读本地科目、分录与期间 |
 | 对账 | Reconciliation | Transaction、Ledger | 读取批次/日记账/试算平衡；写本地对账记录 |
@@ -186,7 +171,7 @@
 | 贷款 | 调用方 → Loan | — | 申请/审批/放款/还款 |
 | 风险处置 | 调用方 → Fraud/AML/Dispute/Collections | — | 评分/筛查/案件状态机 |
 | 运营作业 | 调用方 → Batch/Reporting/Notification/Document/Workflow/Audit/Reference | 下游按需 | 作业、报表、通知、文档、审批、审计、参考数据 |
-| 客户 360 | Web UI → BFF | Account/Card/Customer/Transaction/Marketing | 聚合与降级 |
+| 客户 360 | Web UI → BFF | Account/Card/Customer/Transaction | 聚合与降级 |
 | 统一搜索 | Web UI → Search | Customer/Transaction | 实时过滤 |
 | 交易报表 | Transaction | — | 只读本地交易与参照数据 |
 | 账户视图 | 调用方（UI/BFF） | Account、Customer、Card | 三次查询组合 |
