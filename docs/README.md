@@ -36,3 +36,14 @@
 | 文档 | 内容 |
 |---|---|
 | [ops/01-docker-runbook.md](ops/01-docker-runbook.md) | 构建、启动、调试、排障、重置、安全缺口 |
+| [ops/02-security-and-performance.md](ops/02-security-and-performance.md) | NFR、压测、混沌、OWASP 核对与安全缺口 |
+
+## 4. 模拟需求（2026-10）
+
+| 文档 | 内容 |
+|---|---|
+| [requirements/README.md](requirements/README.md) | 需求包索引、优先级与排期建议 |
+| [requirements/REQ-2026-001-installment.md](requirements/REQ-2026-001-installment.md) | 账单/消费分期：申请、试算、计划、提前结清 |
+| [requirements/REQ-2026-002-card-loss.md](requirements/REQ-2026-002-card-loss.md) | 信用卡挂失与补卡：自助挂失、补卡工单、进度 |
+| [requirements/REQ-2026-003-limit-increase.md](requirements/REQ-2026-003-limit-increase.md) | 额度调整申请与审批：预审、审批流、SoD |
+| [requirements/REQ-2026-004-dispute.md](requirements/REQ-2026-004-dispute.md) | 交易争议：在线申请、证据、临时入账、chargeback |
