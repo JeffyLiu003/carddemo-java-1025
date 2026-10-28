@@ -37,3 +37,4 @@
 | 文档 | 内容 |
 |---|---|
 | [ops/01-docker-runbook.md](ops/01-docker-runbook.md) | 构建、启动、调试、排障、重置、安全缺口 |
+| [ops/02-security-and-performance.md](ops/02-security-and-performance.md) | NFR 目标、k6 压测、混沌/降级与安全收口 |

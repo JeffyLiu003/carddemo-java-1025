@@ -5,6 +5,21 @@
 再按领域边界划分 27 个微服务（6 个既有业务域 + 营销、总账、对账、支付、账单、限额、汇率、信贷、风险、运营、渠道），最后用 Spring Boot 3 落地，并提供面向业务人员的 Web 界面与
 Docker Compose 调试运行能力。
 
+## 0. 当前代码基线
+
+下表每项均与 `main` 分支代码核对过（服务目录、`docker-compose.yml`、`pom.xml`、surefire 报告、ADR 目录）：
+
+| 维度 | 现状 |
+|---|---|
+| 默认分支 | `main`（历史演示分支 `dev-b`、`demo-b2`、`demo-b`、`dev`、`demo` 一并保留） |
+| 技术栈 | Spring Boot 3.3.6 / Java 21 / PostgreSQL 16 / 原生 SPA |
+| 服务 | 27 个 Java 微服务 + `web-ui`，Maven 聚合 28 个模块 |
+| 数据库 | 25 个独立 database（`bff`、`search` 无状态，不建库） |
+| 容器 | Compose 默认 17 个（15 个微服务 + web-ui + postgres），`extended` profile 追加 12 个 |
+| 测试 | `mvn test` 816 个用例全绿（H2 + Flyway） |
+| 决策 | 12 份 ADR（ADR-001–008、010–013；ADR-009 随旧营销模块移除） |
+| 最新能力 | 高端卡期限活动消费返现（marketing-service，见 ADR-013 与 `docs/design/17-premium-cashback-campaign.md`） |
+
 ## 1. 架构总览
 
 ```mermaid
@@ -21,7 +36,7 @@ graph LR
     subgraph 支撑/通用域
       CUST[customer-service :8082<br/>客户主数据]
       IAM[iam-service :8081<br/>登录/用户]
-      MKT[marketing-service :8087<br/>高端卡分期返现]
+      MKT[marketing-service :8087<br/>高端卡返现活动]
       RECON[reconciliation-service :8089<br/>对账/差异处理/EOD]
       BILL[billing-service :8092<br/>账单/利息/最低还款]
       LIMIT[limit-service :8093<br/>限额/用量]
@@ -100,7 +115,7 @@ graph LR
 | billing-service | 8092 | `carddemo_billing` | **新增能力**：账单生成、利息/最低还款、账单支付 |
 | limit-service | 8093 | `carddemo_limit` | **新增能力**：客户/账户/渠道限额、用量与校验 |
 | fx-service | 8094 | `carddemo_fx` | **新增能力**：汇率维护、报价、换汇记录 |
-| marketing-service | 8087 | `carddemo_marketing` | **新增能力**：高端卡分期返现（白金/金卡、1–24 个月、返现上限/预算/报名） |
+| marketing-service | 8087 | `carddemo_marketing` | **新增能力**：高端卡期限活动消费返现（白金/金卡、活动 1–24 个月、单笔/客户/预算上限、报名与效果看板） |
 | loan-service | 8095 | `carddemo_loan` | **新增能力**：贷款申请、审批、放款、等额本息计划、还款 |
 | fraud-service | 8096 | `carddemo_fraud` | **新增能力**：欺诈规则评分、警报与处置 |
 | aml-service | 8097 | `carddemo_aml` | **新增能力**：制裁/名单筛查、AML 警报 |
@@ -126,10 +141,12 @@ carddemo-java-1025/
 ├── docker/postgres/init/        # 25 个 database 初始化
 ├── scripts/build-and-up.sh      # 打包 + 构建镜像 + 启动
 ├── scripts/smoke-test.sh        # 端到端冒烟测试
+├── scripts/chaos-test.sh        # 混沌/降级验证：停总账后过账仍成功
+├── scripts/perf/k6-smoke.js     # k6 只读压测（p95 < 800ms、错误率 < 1%）
 ├── docs/
 │   ├── legacy/                  # 存量知识：清单、五层模型、规则目录、数据字典、术语
 │   ├── design/                  # DDD 设计：子域/上下文/拆分/API/追踪矩阵/ADR
-│   └── ops/                     # Docker 运行与调试手册
+│   └── ops/                     # Docker 运行手册、安全与性能收口
 └── services/
     ├── iam-service/
     ├── customer-service/
@@ -142,7 +159,7 @@ carddemo-java-1025/
     ├── billing-service/          # 账单：生成/利息/最低还款/支付（新增）
     ├── limit-service/            # 限额：额度/用量/校验（新增）
     ├── fx-service/               # 汇率：报价/换汇（新增）
-    ├── marketing-service/        # 高端卡分期返现（新增）
+    ├── marketing-service/        # 高端卡返现活动（新增）
     ├── loan-service/             # 信贷：申请/审批/放款/还款（新增）
     ├── fraud-service/            # 欺诈评分/警报（新增）
     ├── aml-service/              # 制裁筛查/AML 警报（新增）
@@ -176,10 +193,11 @@ src/main/java/com/carddemo/<context>/
 前置：JDK 21、Maven 3.9+、Docker + Compose v2。
 
 ```bash
+git clone https://github.com/JeffyLiu003/carddemo-java-1025.git
 cd carddemo-java-1025
 ./scripts/build-and-up.sh          # mvn package + docker compose up -d --build
 docker compose ps
-./scripts/smoke-test.sh            # 端到端验证（健康、查询、过账、冻结、授权、报表、支付、对账、BFF）
+./scripts/smoke-test.sh            # 端到端验证（健康 → 登录 → 查询 → 入账 → 授权 → 报表 → 支付/对账 → 限额/FX/返现 → BFF/搜索）
 ```
 
 打开 **http://localhost:8090/** 即为业务界面（登录账号已预填，直接登录）。
@@ -193,6 +211,19 @@ docker compose ps
 
 ```bash
 mvn test        # 816 个用例，H2 + Flyway，多模块并行
+```
+
+按需追加能力与验证脚本：
+
+```bash
+# extended profile：再启动 12 个服务（信贷/风控/运营），共 29 个容器
+docker compose --profile extended up -d
+
+# 混沌/降级：停掉 ledger-service 后过账仍成功（总账同步失败只告警），恢复后再冲正
+./scripts/chaos-test.sh
+
+# 只读压测（需 brew install k6）：p95 < 800ms、错误率 < 1%
+k6 run scripts/perf/k6-smoke.js
 ```
 
 ## 3.1 Web 界面（推荐）
@@ -211,7 +242,7 @@ mvn test        # 816 个用例，H2 + Flyway，多模块并行
 | 账单 | 生成账单、查看利息/最低还款/到期日、全额支付（P2 新增） | 新增能力 |
 | 限额 | 创建/调整限额、占用/释放、可用性检查（管理员，P2 新增） | 新增能力 |
 | 汇率 | 汇率维护、报价、执行换汇、换汇记录（P2 新增） | 新增能力 |
-| 高端返现 | 白金/金卡分期活动、报名、消费返现、待入账重试 | 新增能力 |
+| 高端返现 | 白金/金卡期限活动、报名、消费返现、返现失败重试 | 新增能力 |
 | 返现活动 | 创建 1–24 个月活动、产品圈选、发布/暂停/结束、效果（管理员） | 新增能力 |
 | 客户 360 | BFF 聚合账户/卡片/客户/交易/权益，统一搜索（P5 新增） | 新增能力 |
 | 贷款 | 申请、审批/拒绝、放款、还款计划、还款（P3 新增） | 新增能力 |
@@ -349,8 +380,10 @@ curl -s -X POST localhost:8089/api/v1/eod-runs \
 | [docs/legacy/02-five-level-model.md](docs/legacy/02-five-level-model.md) | L1–L5 业务模型（带证据） |
 | [docs/legacy/03-business-rule-catalog.md](docs/legacy/03-business-rule-catalog.md) | 业务规则 → 实现落点 → 状态 |
 | [docs/design/02-bounded-contexts.md](docs/design/02-bounded-contexts.md) | 27 个限界上下文 |
+| [docs/design/04-context-map.md](docs/design/04-context-map.md) | 上下文映射图、集成契约与防腐层 |
 | [docs/design/05-api-catalog.md](docs/design/05-api-catalog.md) | 全部 API 契约与种子数据 |
 | [docs/design/06-traceability-matrix.md](docs/design/06-traceability-matrix.md) | 44 个遗留程序的去向（总账/对账/支付/账单为新增能力） |
+| [docs/design/07-java-conventions.md](docs/design/07-java-conventions.md) | 编码、分层、配置与测试统一基线 |
 | [docs/design/09-scale-up-blueprint.md](docs/design/09-scale-up-blueprint.md) | 规模化蓝图与分阶段路线图 |
 | [docs/design/10-money-path-slice-a1.md](docs/design/10-money-path-slice-a1.md) | A1：账户产品化、冻结、可用额度 |
 | [docs/design/11-money-path-slice-a2.md](docs/design/11-money-path-slice-a2.md) | A2：过账引擎、总账、试算平衡与前台 |
@@ -359,9 +392,10 @@ curl -s -X POST localhost:8089/api/v1/eod-runs \
 | [docs/design/14-risk-credit-collections.md](docs/design/14-risk-credit-collections.md) | P3：信贷、欺诈、AML、争议、催收、批处理 |
 | [docs/design/15-operations-support.md](docs/design/15-operations-support.md) | P4：报表、通知、文档、工作流、审计、参考数据 |
 | [docs/design/16-channel-and-quality.md](docs/design/16-channel-and-quality.md) | P5/P6：BFF、搜索、门户、性能、混沌与安全 |
-| [docs/design/17-premium-cashback-campaign.md](docs/design/17-premium-cashback-campaign.md) | 高端卡分期返现：需求、影响、架构、Review 与测试 |
-| [docs/design/adr/README.md](docs/design/adr/README.md) | 12 个架构决策 |
+| [docs/design/17-premium-cashback-campaign.md](docs/design/17-premium-cashback-campaign.md) | 高端卡返现活动：需求、影响、架构、Review 与测试 |
+| [docs/design/adr/README.md](docs/design/adr/README.md) | 12 个架构决策（ADR-001–008、010–013） |
 | [docs/ops/01-docker-runbook.md](docs/ops/01-docker-runbook.md) | Docker 调试运行手册 |
+| [docs/ops/02-security-and-performance.md](docs/ops/02-security-and-performance.md) | 安全、性能（k6）、混沌与质量收口 |
 
 ## 7. 已知限制（POC 范围）
 
@@ -370,7 +404,8 @@ curl -s -X POST localhost:8089/api/v1/eod-runs \
 2. **无分布式事务**：账单支付/入账采用"本地事务 + 同步调用 + 幂等键"，Saga/Outbox 见 ADR-005。
 3. **报表只迁移数据口径**，不迁移 133 字节打印排版；对账单/分行迁移/MQ 适配器为延后项。
 4. **种子数据为归一化样例**：遗留 ASCII 数据存在 EBCDIC 过穿孔字符，真实迁移须按数据字典解码。
-5. 单账户并发授权使用乐观锁，热点账户需重试；压测与分区方案待补（未解决项 U1）。
+5. 单账户并发授权使用乐观锁，热点账户需重试；已提供 k6 只读压测（`scripts/perf/k6-smoke.js`，
+   NFR 目标见 `docs/ops/02-security-and-performance.md`），分区与写路径压测仍待补（未解决项 U1）。
 6. **总账为新增能力**：过账后同步调用总账，失败只告警（`ledgerEntryId` 为空），尚无 Outbox 重试；
    试算平衡按发生额汇总，不包含期初余额；期间关账暂不支持反关账。
 7. **对账为新增能力**：当前只做“过账批次 ↔ 总账日记账”与试算平衡检查；账户余额 vs 总账 1100
