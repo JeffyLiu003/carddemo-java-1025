@@ -29,7 +29,7 @@
 | [design/14-risk-credit-collections.md](design/14-risk-credit-collections.md) | P3：信贷、欺诈、AML、争议、催收、批处理 |
 | [design/15-operations-support.md](design/15-operations-support.md) | P4：报表、通知、文档、工作流、审计、参考数据 |
 | [design/16-channel-and-quality.md](design/16-channel-and-quality.md) | P5/P6：BFF、搜索、门户、性能、混沌与安全 |
-| [design/17-premium-cashback-campaign.md](design/17-premium-cashback-campaign.md) | 高端卡分期返现：需求、影响、架构、Review 与测试 |
+| [design/17-premium-cashback-campaign.md](design/17-premium-cashback-campaign.md) | 高端卡返现活动：需求、影响、架构、Review 与测试 |
 | [design/adr/README.md](design/adr/README.md) | 12 个架构决策记录（MADR） |
 
 ## 3. 运维
@@ -38,3 +38,13 @@
 |---|---|
 | [ops/01-docker-runbook.md](ops/01-docker-runbook.md) | 构建、启动、调试、排障、重置、安全缺口 |
 | [ops/02-security-and-performance.md](ops/02-security-and-performance.md) | NFR 目标、k6 压测、混沌/降级与安全收口 |
+
+## 4. 模拟需求（2026-10）
+
+| 文档 | 内容 |
+|---|---|
+| [requirements/README.md](requirements/README.md) | 需求包索引、优先级与排期建议 |
+| [requirements/REQ-2026-001-installment.md](requirements/REQ-2026-001-installment.md) | 账单/消费分期：申请、试算、计划、提前结清 |
+| [requirements/REQ-2026-002-card-loss.md](requirements/REQ-2026-002-card-loss.md) | 信用卡挂失与补卡：自助挂失、补卡工单、进度 |
+| [requirements/REQ-2026-003-limit-increase.md](requirements/REQ-2026-003-limit-increase.md) | 额度调整申请与审批：预审、审批流、SoD |
+| [requirements/REQ-2026-004-dispute.md](requirements/REQ-2026-004-dispute.md) | 交易争议：在线申请、证据、临时入账、chargeback |
