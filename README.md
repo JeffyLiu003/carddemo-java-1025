@@ -146,6 +146,7 @@ carddemo-java-1025/
 ├── docs/
 │   ├── legacy/                  # 存量知识：清单、五层模型、规则目录、数据字典、术语
 │   ├── design/                  # DDD 设计：子域/上下文/拆分/API/追踪矩阵/ADR
+│   ├── requirements/            # 模拟需求包：分期、挂失补卡、提额审批、交易争议
 │   └── ops/                     # Docker 运行手册、安全与性能收口
 └── services/
     ├── iam-service/
@@ -396,6 +397,11 @@ curl -s -X POST localhost:8089/api/v1/eod-runs \
 | [docs/design/adr/README.md](docs/design/adr/README.md) | 12 个架构决策（ADR-001–008、010–013） |
 | [docs/ops/01-docker-runbook.md](docs/ops/01-docker-runbook.md) | Docker 调试运行手册 |
 | [docs/ops/02-security-and-performance.md](docs/ops/02-security-and-performance.md) | 安全、性能（k6）、混沌与质量收口 |
+| [docs/requirements/README.md](docs/requirements/README.md) | 模拟需求包索引（优先级、档位与排期建议） |
+| [docs/requirements/REQ-2026-001-installment.md](docs/requirements/REQ-2026-001-installment.md) | 需求包：账单/消费分期 |
+| [docs/requirements/REQ-2026-002-card-loss.md](docs/requirements/REQ-2026-002-card-loss.md) | 需求包：信用卡挂失与补卡 |
+| [docs/requirements/REQ-2026-003-limit-increase.md](docs/requirements/REQ-2026-003-limit-increase.md) | 需求包：额度调整申请与审批 |
+| [docs/requirements/REQ-2026-004-dispute.md](docs/requirements/REQ-2026-004-dispute.md) | 需求包：交易争议在线申请与处理 |
 
 ## 7. 已知限制（POC 范围）
 
@@ -420,3 +426,5 @@ curl -s -X POST localhost:8089/api/v1/eod-runs \
     本期不含积分、A/B、复杂客群 DSL；返现失败保留 PENDING 可重试。
 12. **扩展服务默认不启动**：为控制内存，P3/P4 的 12 个服务放在 Compose `extended` profile，
     使用 `docker compose --profile extended up -d` 启动；默认运行 17 个容器。
+13. **需求包未实施**：`docs/requirements/` 下的四份模拟需求（分期、挂失补卡、提额审批、争议全流程）
+    是待实施输入，除已有演示级的 `dispute`/`limit` 服务子集外均未落地；其指标与规则为演示假设。
