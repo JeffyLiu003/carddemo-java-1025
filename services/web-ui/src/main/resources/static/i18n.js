@@ -1878,7 +1878,8 @@
      * 后台接口：/api/ 请求自动带 Accept-Language
      * ------------------------------------------------------------------ */
     function acceptLanguage() {
-        return isEnglish() ? 'en-US,en;q=0.9' : 'zh-CN,zh;q=0.9';
+        // 后台 API 统一英文；界面语言只影响展示，不影响接口语言
+        return 'en-US,en;q=0.9';
     }
 
     const nativeFetch = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
