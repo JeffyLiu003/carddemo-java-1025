@@ -1778,6 +1778,8 @@
             return;
         }
         let button = chip.querySelector(`[${TOGGLE_ATTR}]`);
+        const floating = document.querySelector('[data-i18n-floating]');
+        if (floating) floating.remove();
         if (!button) {
             button = document.createElement('button');
             button.type = 'button';
