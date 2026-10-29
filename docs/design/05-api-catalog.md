@@ -709,6 +709,7 @@
 | POST | `/api/v1/rewards/{rewardId}/retry` | 待入账重试 |
 | GET | `/api/v1/campaigns/{id}/performance` | 效果 |
 | GET | `/api/v1/marketing/summary` | 看板 |
+| POST | `/api/v1/reward-reversals` | 退款/冲正受理，按活动 `reversalPolicy` 计算追扣；口径未确认返回 409（设计 18 号） |
 
 创建活动示例：
 
@@ -820,6 +821,9 @@
 | CUSTOMER_CAP_REACHED | 409 | marketing | 客户返现上限已满 |
 | BUDGET_EXHAUSTED | 409 | marketing | 活动预算已用完 |
 | REWARD_NOT_FOUND | 404 | marketing | 返现记录不存在 |
+| REVERSAL_POLICY_UNCONFIRMED | 409 | marketing | 活动未配置追扣口径，追扣记录保留为 PENDING |
+| PARTIAL_REVERSAL_POLICY_UNCONFIRMED | 409 | marketing | FULL 口径下的部分退款需业务确认 |
+| INVALID_REVERSAL_TYPE | 400 | marketing | 退款/冲正类型不在枚举内 |
 | INVALID_CREDIT_AMOUNT | 409 | account | 贷记金额非法 |
 | CREDIT_ID_CONFLICT | 409 | account | 贷记幂等键跨账户复用 |
 | NOTHING_TO_PAY | 409 | account/transaction | 无欠款，不能还款 |

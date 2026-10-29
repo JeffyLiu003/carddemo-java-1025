@@ -24,6 +24,9 @@ public interface RewardGrantJpaRepository extends JpaRepository<RewardGrant, Str
     @Override
     Optional<RewardGrant> findByCampaignIdAndTransactionId(String campaignId, String transactionId);
 
+    @Override
+    List<RewardGrant> findByTransactionId(String transactionId);
+
     Page<RewardGrant> findByAccountId(String accountId, Pageable pageable);
 
     Page<RewardGrant> findByCustomerId(String customerId, Pageable pageable);
