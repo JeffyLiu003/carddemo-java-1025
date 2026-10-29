@@ -1,8 +1,14 @@
 package com.carddemo.webui.proxy;
 
+import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletRequest;
+
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -167,5 +173,40 @@ class ApiProxyControllerTest {
         assertThat(controller.resolveTarget("/api/v1/reward")).isNull();
         assertThat(controller.resolveTarget("/api/v1/eligibilitie")).isNull();
         assertThat(controller.resolveTarget("/api/v1/bffx")).isNull();
+    }
+
+    @Test
+    void forwardsAcceptLanguageHeaderToUpstream() throws Exception {
+        AtomicReference<String> upstreamHeader = new AtomicReference<>();
+        HttpServer upstream = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        upstream.createContext("/api/v1/cards", exchange -> {
+            upstreamHeader.set(exchange.getRequestHeaders().getFirst("Accept-Language"));
+            byte[] payload = "{\"items\":[]}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, payload.length);
+            exchange.getResponseBody().write(payload);
+            exchange.close();
+        });
+        upstream.start();
+        try {
+            String base = "http://127.0.0.1:" + upstream.getAddress().getPort();
+            ApiProxyController proxy = controllerPointingAt(base);
+            MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/cards");
+            request.addHeader("Accept-Language", "en-US,en;q=0.9");
+
+            ResponseEntity<byte[]> response = proxy.proxy(request, null);
+
+            assertThat(response.getStatusCode().value()).isEqualTo(200);
+            assertThat(upstreamHeader.get()).isEqualTo("en-US,en;q=0.9");
+        } finally {
+            upstream.stop(0);
+        }
+    }
+
+    private static ApiProxyController controllerPointingAt(String baseUrl) {
+        return new ApiProxyController(baseUrl, baseUrl, baseUrl, baseUrl, baseUrl, baseUrl, baseUrl,
+                baseUrl, baseUrl, baseUrl, baseUrl, baseUrl, baseUrl, baseUrl, baseUrl, baseUrl,
+                baseUrl, baseUrl, baseUrl, baseUrl, baseUrl, baseUrl, baseUrl, baseUrl, baseUrl,
+                baseUrl, baseUrl);
     }
 }
