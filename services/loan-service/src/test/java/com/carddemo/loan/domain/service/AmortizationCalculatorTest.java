@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class AmortizationCalculatorTest {
 
-    private static final LocalDate FIRST_DUE = LocalDate.of(2026, 3, 15);
+    private static final LocalDate ANCHOR = LocalDate.of(2026, 3, 15);
 
     @Test
     void computesMonthlyPaymentWithHalfUpRounding() {
@@ -29,7 +29,7 @@ class AmortizationCalculatorTest {
     @Test
     void buildsThreeInstallmentSchedule() {
         List<ScheduleLine> lines = AmortizationCalculator.buildSchedule(new BigDecimal("1000.00"),
-                new BigDecimal("0.1200"), 3, FIRST_DUE);
+                new BigDecimal("0.1200"), 3, ANCHOR);
 
         assertThat(lines).hasSize(3);
         assertLine(lines.get(0), 1, "330.02", "10.00", "340.02");
@@ -42,7 +42,7 @@ class AmortizationCalculatorTest {
     @Test
     void buildsTwelveInstallmentScheduleWithFinalAdjustment() {
         List<ScheduleLine> lines = AmortizationCalculator.buildSchedule(new BigDecimal("12000.00"),
-                new BigDecimal("0.1800"), 12, FIRST_DUE);
+                new BigDecimal("0.1800"), 12, ANCHOR);
 
         assertThat(lines).hasSize(12);
         assertLine(lines.get(0), 1, "920.16", "180.00", "1100.16");
@@ -54,7 +54,7 @@ class AmortizationCalculatorTest {
     @Test
     void zeroRateSplitsPrincipalEvenly() {
         List<ScheduleLine> lines = AmortizationCalculator.buildSchedule(new BigDecimal("1200.00"),
-                new BigDecimal("0.0000"), 12, FIRST_DUE);
+                new BigDecimal("0.0000"), 12, ANCHOR);
 
         assertThat(lines).allSatisfy(line -> {
             assertThat(line.interestDue()).isEqualByComparingTo("0.00");
@@ -67,10 +67,22 @@ class AmortizationCalculatorTest {
     @Test
     void dueDatesFallOnTheSameDayEveryMonth() {
         List<ScheduleLine> lines = AmortizationCalculator.buildSchedule(new BigDecimal("1000.00"),
-                new BigDecimal("0.1200"), 3, FIRST_DUE);
+                new BigDecimal("0.1200"), 3, ANCHOR);
 
-        assertThat(lines.get(0).dueDate()).isEqualTo(FIRST_DUE);
-        assertThat(lines.get(2).dueDate()).isEqualTo(FIRST_DUE.plusMonths(2));
+        assertThat(lines.get(0).dueDate()).isEqualTo(ANCHOR.plusMonths(1));
+        assertThat(lines.get(1).dueDate()).isEqualTo(ANCHOR.plusMonths(2));
+        assertThat(lines.get(2).dueDate()).isEqualTo(ANCHOR.plusMonths(3));
+    }
+
+    @Test
+    void keepsMonthEndAnchorsInsteadOfCompoundingTheShortMonth() {
+        // 基准日为月末时，各期按基准日逐期加月：10-31 → 11-30 → 12-31 → 01-31
+        List<ScheduleLine> lines = AmortizationCalculator.buildSchedule(new BigDecimal("1000.00"),
+                new BigDecimal("0.1200"), 3, LocalDate.of(2026, 10, 31));
+
+        assertThat(lines.get(0).dueDate()).isEqualTo(LocalDate.of(2026, 11, 30));
+        assertThat(lines.get(1).dueDate()).isEqualTo(LocalDate.of(2026, 12, 31));
+        assertThat(lines.get(2).dueDate()).isEqualTo(LocalDate.of(2027, 1, 31));
     }
 
     private static void assertLine(ScheduleLine line, int installmentNo, String principal, String interest,
