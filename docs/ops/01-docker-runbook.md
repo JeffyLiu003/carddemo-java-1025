@@ -195,7 +195,7 @@ docker compose up -d --build
 
 | Item | Result |
 |---|---|
-| `mvn test` (27 modules) | 762 test cases all green |
+| `mvn test` (27 modules) | 763 test cases all green |
 | `mvn verify` | JaCoCo report; both ArchUnit rules pass |
 | `docker compose up -d --build` | 16 default containers started, 15 services health=UP |
 | `docker compose --profile extended up -d` | 12 extension services added (29 containers in total) |

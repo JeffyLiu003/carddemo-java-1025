@@ -37,7 +37,7 @@
 | web-ui | 4 | 241 | - | Static pages + reverse proxy |
 | **Total** | **298** | **15,717** | **54** | 36 tables, 197 tests |
 
-> The table above is a snapshot taken during the scale-up analysis. After A1.1–A1.4, P2 and P3–P5 landed: 48,374 lines of Java / 903 files / 762 tests
+> The table above is a snapshot taken during the scale-up analysis. After A1.1–A1.4, P2 and P3–P5 landed: 48,396 lines of Java / 903 files / 763 tests
 > across the repository, 26 business services + web-ui; 16 containers by default, with `--profile extended` adding 12 extension services.
 
 Supporting facts:

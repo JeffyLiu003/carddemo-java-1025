@@ -187,7 +187,7 @@ Open **http://localhost:8090/** to reach the business UI (the login account is p
 All unit/integration tests:
 
 ```bash
-mvn test        # 762 test cases, H2 + Flyway, multi-module in parallel
+mvn test        # 763 test cases, H2 + Flyway, multi-module in parallel
 ```
 
 ## 3.1 Web UI (Recommended)
