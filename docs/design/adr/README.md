@@ -1,15 +1,15 @@
-# ADR 索引
+# ADR Index
 
-| 编号 | 标题 | 状态 | 关联设计文档 |
+| ID | Title | Status | Related design documents |
 |---|---|---|---|
-| ADR-001 | 按 DDD 限界上下文拆分为 6 个微服务 | 已接受 | `02-bounded-contexts.md`、`03-service-decomposition.md` |
-| ADR-002 | 遗留标识符与金额的建模方式 | 已接受 | `04-data-dictionary`、`07-java-conventions.md` |
-| ADR-003 | 数据所有权与"每服务一库" | 已接受 | `03-service-decomposition.md`、`04-context-map.md` |
-| ADR-004 | 跨聚合用例的编排归属 | 已接受 | `03-service-decomposition.md` §4 |
-| ADR-005 | 跨服务一致性与幂等策略 | 已接受 | `03-service-decomposition.md` §5 |
-| ADR-006 | 并发控制改为乐观锁 | 已接受 | `07-java-conventions.md` §6 |
-| ADR-007 | 鉴权强制校验的范围（POC） | 已接受（有风险） | `docs/ops/01-docker-runbook.md` §7 |
-| ADR-008 | 密码存储与登录错误语义 | 已接受 | `02-bounded-contexts.md` §IAM |
-| ADR-010 | 过账引擎与总账的职责分离 | 已接受 | `11-money-path-slice-a2.md` §2–3 |
-| ADR-011 | 对账只读与差异处理边界 | 已接受 | `12-reconciliation-and-eod.md` §2、§5 |
-| ADR-012 | 支付清算通过过账批次落账 | 已接受 | `13-payments-billing-limits-fx.md` §2 |
+| ADR-001 | Split into 6 microservices by DDD bounded context | Accepted | `02-bounded-contexts.md`, `03-service-decomposition.md` |
+| ADR-002 | Modeling approach for legacy identifiers and amounts | Accepted | `04-data-dictionary`, `07-java-conventions.md` |
+| ADR-003 | Data ownership and "one database per service" | Accepted | `03-service-decomposition.md`, `04-context-map.md` |
+| ADR-004 | Orchestration ownership for cross-aggregate use cases | Accepted | `03-service-decomposition.md` §4 |
+| ADR-005 | Cross-service consistency and idempotency strategy | Accepted | `03-service-decomposition.md` §5 |
+| ADR-006 | Concurrency control switched to optimistic locking | Accepted | `07-java-conventions.md` §6 |
+| ADR-007 | Scope of mandatory authentication checks (POC) | Accepted (with risks) | `docs/ops/01-docker-runbook.md` §7 |
+| ADR-008 | Password storage and login error semantics | Accepted | `02-bounded-contexts.md` §IAM |
+| ADR-010 | Separation of responsibilities between the posting engine and the general ledger | Accepted | `11-money-path-slice-a2.md` §2–3 |
+| ADR-011 | Read-only reconciliation and difference handling boundaries | Accepted | `12-reconciliation-and-eod.md` §2, §5 |
+| ADR-012 | Payment settlement recorded through posting batches | Accepted | `13-payments-billing-limits-fx.md` §2 |

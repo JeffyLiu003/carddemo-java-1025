@@ -1,47 +1,47 @@
-# ADR-012: 支付清算通过过账批次落账
+# ADR-012: Payment Settlement Recorded through Posting Batches
 
-| 项 | 内容 |
+| Item | Content |
 |----|------|
-| 编号 | ADR-012 |
-| 日期 | 2026-10-26 |
-| 状态 | 已接受 |
-| 关联需求 | `docs/design/13-payments-billing-limits-fx.md` §2 |
+| ID | ADR-012 |
+| Date | 2026-10-26 |
+| Status | Accepted |
+| Related requirements | `docs/design/13-payments-billing-limits-fx.md` §2 |
 
-## 背景
+## Context
 
-payment-service 在清算（settle）时需要真正减少付款账户余额。可选路径：
+payment-service needs to actually reduce the payer account balance when settling (settle). The possible paths are:
 
-1. 直接调用 account-service 的 `/postings` 改余额；
-2. 调用 transaction-service 创建 `PAYMENT` 过账批次；
-3. 直接写 ledger 日记账。
+1. Call account-service `/postings` directly to change the balance;
+2. Call transaction-service to create a `PAYMENT` posting batch;
+3. Write ledger journal entries directly.
 
-需要兼顾：账务可追溯、借贷平衡、退汇可冲正、幂等重试。
+The following must all be satisfied: traceable accounting, balanced debits and credits, reversibility of returned payments, and idempotent retries.
 
-## 候选方案
+## Alternatives
 
-| 方案 | 描述 | 优点 | 缺点 |
+| Option | Description | Pros | Cons |
 |---|---|---|---|
-| A：直接改余额 | payment → account `/postings` | 链路最短 | 无借贷分录；退汇需另建补偿；审计弱 |
-| B：过账批次（采用） | payment → transaction `POST /posting-batches`（type=PAYMENT） | 复用规则/分录/冲正/总账；幂等键清晰 | 依赖 transaction；多一跳 |
-| C：直接写总账 | payment → ledger `/journal-entries` | 分录直接 | 账户余额与总账可能不一致；绕过业务规则 |
+| A: change the balance directly | payment → account `/postings` | Shortest path | No debit/credit entries; returned payments need separate compensation; weak audit |
+| B: posting batch (adopted) | payment → transaction `POST /posting-batches` (type=PAYMENT) | Reuses rules/entries/reversal/general ledger; clear idempotency key | Depends on transaction; one extra hop |
+| C: write the general ledger directly | payment → ledger `/journal-entries` | Entries written directly | Account balances and general ledger may diverge; bypasses business rules |
 
-## 决策
+## Decision
 
-采用方案 B：
+Adopt Option B:
 
-1. 清算时以 `payment:<paymentId>` 为幂等键创建 `PAYMENT` 过账批次（accountEffect=DECREASE）。
-2. 批次成功返回 `transactionBatchId` 后支付单置 SETTLED；重复 settle 直接返回。
-3. 退汇时若已清算，调用 `POST /posting-batches/{batchId}/reversal` 冲正，再置 RETURNED。
-4. 下游失败返回 503，支付单状态不变，可重试；不直接修改 account 余额或 ledger。
+1. During settlement, create a `PAYMENT` posting batch with `payment:<paymentId>` as the idempotency key (accountEffect=DECREASE).
+2. After the batch succeeds and returns `transactionBatchId`, the payment order is set to SETTLED; a repeated settle returns directly.
+3. For a returned payment that has already settled, call `POST /posting-batches/{batchId}/reversal` to reverse it, then set the order to RETURNED.
+4. A downstream failure returns 503 and leaves the payment order status unchanged, allowing retries; account balances and the ledger are never modified directly.
 
-## 后果
+## Consequences
 
-- 支付链路依赖 transaction-service；其不可用时支付无法清算（失败关闭）。
-- 总账同步仍为 transaction 的尽力而为策略（ADR-010），支付单不感知。
-- 未来接真实清算网络时，只需替换 settle 的渠道适配器，落账路径不变。
-- 当前未实现 cut-off、真实报文与退汇原因码；属演示级边界。
+- The payment path depends on transaction-service; when it is unavailable, payments cannot be settled (fail closed).
+- General ledger synchronization remains transaction's best-effort strategy (ADR-010), and payment orders are unaware of it.
+- When connecting to a real settlement network in the future, only the settlement channel adapter needs replacing; the posting path stays the same.
+- Cut-off times, real messages, and return reason codes are not implemented yet; these are demo-level boundaries.
 
-## 证据
+## Evidence
 
 - `docs/design/13-payments-billing-limits-fx.md` §2
 - `services/payment-service/src/main/java/com/carddemo/payment/application/PaymentOrderService.java`

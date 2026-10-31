@@ -1,105 +1,105 @@
-# 领域分析：子域、聚合与不变量
+# Domain Analysis: Subdomains, Aggregates and Invariants
 
-> 依据：`docs/legacy/02-five-level-model.md`（L1–L5）与 `03-business-rule-catalog.md`。
-> 本文回答"业务上什么是核心、边界在哪、聚合如何划分"，不涉及技术实现。
+> Basis: `docs/legacy/02-five-level-model.md` (L1–L5) and `03-business-rule-catalog.md`.
+> This document answers "what is core in the business, where the boundaries lie, and how aggregates are partitioned"; it does not address technical implementation.
 
-## 1. 子域划分（Core / Supporting / Generic）
+## 1. Subdomain Partitioning (Core / Supporting / Generic)
 
-| 子域 | 类型 | 判定理由 | 对应能力 |
+| Subdomain | Type | Rationale | Corresponding capability |
 |---|---|---|---|
-| 授权（Authorization） | 核心域 | 实时决定"批准/拒绝"，直接决定信用风险与资金损失；规则复杂且需可审计 | C7 |
-| 账务与交易（Transaction / Posting） | 核心域 | 交易主档是不可变事实来源，余额与类别累计是派生状态；入账与利息直接影响账务正确性 | C6、C8、C9 |
-| 账户（Account） | 核心域 | 额度、余额、账期是风险与计费的基础；并发更新最敏感 | C4 |
-| 总账（Ledger） | 核心域（新增） | 复式记账是资金事实的会计投影；借贷平衡、期间关账与试算平衡是审计基础 | 新增 |
-| 对账（Reconciliation） | 支撑域（新增） | 校验过账与总账完整性/金额一致；只读账务，差异可跟踪；EOD 作业入口 | 新增 |
-| 支付（Payment） | 核心域（新增） | 支付指令生命周期决定资金出境；筛查、清算、退汇与过账强相关 | 新增 |
-| 账单（Billing） | 支撑域（新增） | 账单/利息/最低还款是计费与还款的基础；依赖账户快照 | 新增 |
-| 限额（Limit） | 支撑域（新增） | 额度占用与释放为授权/支付提供风控输入；规则相对独立 | 新增 |
-| 汇率（FX） | 支撑域（新增） | 多币种报价与换汇；可独立演进 | 新增 |
-| 卡片（Card） | 核心域（支撑性较强） | 卡号-账户-客户映射与卡状态决定交易能否发生；但领域规则相对薄 | C5 |
-| 客户（Customer） | 支撑域 | 主数据维护，规则以校验为主，不产生资金语义 | C3 |
-| 身份与访问（IAM） | 通用域 | 登录、用户维护，任何系统都需要；可购买/替换 | C1、C2 |
-| 报表（Reporting） | 支撑域 | 只读派生视图，无写入语义；可独立演进为数据平台 | C11 |
-| 数据迁移（Migration） | 通用/一次性 | 批处理导入导出，属于实施工具而非业务能力 | C12、C13 |
+| Authorization | Core Domain | Real-time decision of "approve/decline" that directly determines credit risk and financial loss; the rules are complex and must be auditable | C7 |
+| Transaction / Posting | Core Domain | The transaction master record is an immutable source of truth; balances and category accumulations are derived state; posting and interest directly affect accounting correctness | C6, C8, C9 |
+| Account | Core Domain | Limit, balance and billing cycle are the basis of risk and billing; most sensitive to concurrent updates | C4 |
+| Ledger | Core Domain (new) | Double-entry bookkeeping is the accounting projection of financial facts; debit/credit balance, period closing and trial balance are the audit foundation | New |
+| Reconciliation | Supporting Domain (new) | Verifies integrity and amount consistency between postings and the general ledger; accounting is read-only and discrepancies are traceable; entry point for EOD jobs | New |
+| Payment | Core Domain (new) | The payment instruction lifecycle determines outbound funds; screening, settlement and returns are closely related to posting | New |
+| Billing | Supporting Domain (new) | Statements, interest and minimum payment are the basis of billing and repayment; depends on account snapshots | New |
+| Limit | Supporting Domain (new) | Limit holds and releases provide risk-control input for authorization/payment; the rules are relatively independent | New |
+| FX | Supporting Domain (new) | Multi-currency quotes and conversion; can evolve independently | New |
+| Card | Core Domain (strongly supporting in nature) | The card number–account–customer mapping and card status determine whether a transaction can occur; however the domain rules are relatively thin | C5 |
+| Customer | Supporting Domain | Master data maintenance; the rules are mostly validation and carry no financial semantics | C3 |
+| Identity and Access (IAM) | Generic Domain | Login and user maintenance, needed by any system; can be bought/replaced | C1, C2 |
+| Reporting | Supporting Domain | Read-only derived views with no write semantics; can evolve independently into a data platform | C11 |
+| Data Migration | Generic / one-off | Batch import and export; an implementation tool rather than a business capability | C12, C13 |
 
-**结论**：核心域 = 授权、账务/交易、总账、支付、账户、卡片；支撑域 = 客户、对账、账单、限额、汇率、报表；通用域 = IAM、迁移工具。
+**Conclusion**: Core domains = authorization, transaction/accounting, ledger, payment, account, card; supporting domains = customer, reconciliation, billing, limit, FX, reporting; generic domains = IAM and the migration tool.
 
-## 2. 聚合设计
+## 2. Aggregate Design
 
-### 2.1 聚合清单
+### 2.1 Aggregate Inventory
 
-| 聚合根 | 内部实体/值对象 | 事务边界内必须成立的不变量 |
+| Aggregate root | Internal entities / value objects | Invariants that must hold within the transaction boundary |
 |---|---|---|
-| `Account` | 额度、余额、账期、账户组 | 状态 ∈ {Y,N}；五项金额非空；三个日期非空且世纪 19/20；记账时余额与本期贷/借同步变化；还款后余额不为负 |
-| `AccountProduct` | 额度上下限、APR、月费、账单日 | 产品编码唯一；额度上限 ≥ 默认值；停售产品不可被新账户引用 |
-| `AccountHold` | 金额、状态、来源、过期时间 | 金额 > 0；ACTIVE 才占用额度；同一账户+referenceId 幂等；状态机 ACTIVE→RELEASED/EXPIRED/CAPTURED |
-| `Card` | 卡号、账户号、客户号、有效期、状态 | 状态 ∈ {Y,N}；月 1–12、年 1950–2099；卡名非空且仅字母空格；CVV 不可被在线维护覆盖 |
-| `Customer` | 姓名、地址、SSN、FICO、电话、EFT | 姓名/城市/地址行 1 必填；SSN 首段合法；FICO 300–850；DOB 不晚于今天 |
-| `TransactionRecord` | 类型、类别、金额、商户、时间戳 | 类型/类别/来源/描述/金额必填；金额与日期格式合法；交易号唯一且为 16 位 |
-| `PostingBatch` | 类型、账户、金额、幂等键、借贷分录 | 金额 > 0；Σ借 = Σ贷 = 金额；幂等键唯一；冲正生成反向批次且原批次置 REVERSED |
-| `JournalEntry` | 来源、记账时间、状态、分录行 | 至少两行；行金额 > 0；Σ借 = Σ贷；科目存在且启用；期间未关账；`(sourceType, sourceId)` 幂等 |
-| `AccountingPeriod` | 期间、状态、关账时间 | 期间格式 YYYY-MM；OPEN → CLOSED 单向；已关账不可再记账 |
-| `ReconciliationRun` | 业务日期、统计、状态 | 同一运行内统计自洽；下游失败置 FAILED 并保留错误信息；只读账务 |
-| `ReconciliationItem` | 检查类型、引用、金额、差异、状态 | difference = expected − actual；差异处理只更新 resolved 与说明 |
-| `PaymentOrder` | 付款账户、收款人、金额、幂等键、状态 | 金额>0；状态单向；幂等键唯一；清算键 payment:<id> |
-| `Statement` | 账户、期间、余额、消费/还款、利息、最低还款 | 账户+期间唯一；期末=余额；利息=余额×APR/12；最低还款=min(余额,max(25,余额×3%)) |
-| `LimitDefinition` | 范围、类型、额度、已用 | 额度>0；已用≤额度；唯一业务键；释放不得使已用<0 |
-| `FxQuote` | 币种对、金额、汇率、有效期 | 金额>0；币种不同；5 分钟有效；只能消费一次 |
-| `TranCategoryBalance` | (账户, 类型, 类别) → 累计额 | 与交易写入同事务；不存在时以金额初始化 |
-| `AuthorizationCase` | 请求快照、决策、原因码 | 决策原因码优先级固定；批准金额 ∈ {0, 交易金额}；拒绝必须带原因码 |
-| `PendingAuthorizationSummary` | 额度、信用余额、批准/拒绝笔数与金额 | 批准：笔数+1、金额+、信用余额+；拒绝：笔数+1、金额+；信用余额 = Σ未过期批准金额（清理时回退） |
-| `SecUser` | 用户号、姓名、密码哈希、类型 | 用户号唯一 8 位；类型 ∈ {A,U}；至少保留一个 A |
+| `Account` | Limit, balance, billing cycle, account group | Status ∈ {Y,N}; all five amounts non-null; all three dates non-null with century 19/20; on posting, the balance and the current-cycle credit/debit change together; the balance is not negative after repayment |
+| `AccountProduct` | Limit bounds, APR, monthly fee, statement day | Product code is unique; maximum limit ≥ default value; a discontinued product cannot be referenced by new accounts |
+| `AccountHold` | Amount, status, source, expiry time | Amount > 0; only ACTIVE holds consume limit; the same account + referenceId is idempotent; state machine ACTIVE→RELEASED/EXPIRED/CAPTURED |
+| `Card` | Card number, account number, customer number, expiry, status | Status ∈ {Y,N}; month 1–12, year 1950–2099; embossed name is non-empty and letters/spaces only; the CVV cannot be overwritten by online maintenance |
+| `Customer` | Name, address, SSN, FICO, phone, EFT | First/last name, city and address line 1 are required; the first SSN segment is valid; FICO 300–850; DOB is not later than today |
+| `TransactionRecord` | Type, category, amount, merchant, timestamp | Type/category/source/description/amount are required; the amount and date formats are valid; the transaction number is unique and 16 digits |
+| `PostingBatch` | Type, account, amount, idempotency key, debit/credit legs | Amount > 0; Σdebit = Σcredit = amount; the idempotency key is unique; a reversal produces an opposite batch and the original batch is set to REVERSED |
+| `JournalEntry` | Source, posting time, status, lines | At least two lines; line amount > 0; Σdebit = Σcredit; the account exists and is active; the period is not closed; `(sourceType, sourceId)` is idempotent |
+| `AccountingPeriod` | Period, status, closing time | Period format is YYYY-MM; OPEN → CLOSED is one-way; a closed period cannot accept new entries |
+| `ReconciliationRun` | Business date, statistics, status | Statistics within a run are self-consistent; a downstream failure sets FAILED and preserves the error message; accounting is read-only |
+| `ReconciliationItem` | Check type, reference, amount, difference, status | difference = expected − actual; resolving a discrepancy only updates resolved and the note |
+| `PaymentOrder` | Debit account, creditor, amount, idempotency key, status | Amount > 0; status is one-way; the idempotency key is unique; settlement key `payment:<id>` |
+| `Statement` | Account, period, balance, purchases/repayments, interest, minimum payment | Account + period is unique; closing balance = balance; interest = balance × APR/12; minimum payment = min(balance, max(25, balance × 3%)) |
+| `LimitDefinition` | Scope, type, limit, used | Limit > 0; used ≤ limit; unique business key; a release must not make used < 0 |
+| `FxQuote` | Currency pair, amount, FX rate, validity | Amount > 0; the currencies differ; valid for 5 minutes; can be consumed only once |
+| `TranCategoryBalance` | (account, type, category) → accumulated amount | Written in the same transaction as the transaction; initialized with the amount when absent |
+| `AuthorizationCase` | Request snapshot, decision, reason code | Reason-code priority for the decision is fixed; approved amount ∈ {0, transaction amount}; a decline must carry a reason code |
+| `PendingAuthorizationSummary` | Limit, credit balance, approved/declined counts and amounts | Approval: count + 1, amount +, credit balance +; decline: count + 1, amount +; credit balance = Σ non-expired approved amounts (rolled back on purge) |
+| `SecUser` | User ID, name, password hash, type | User ID is unique and 8 characters; type ∈ {A,U}; at least one A is retained |
 
-### 2.2 聚合边界判定依据
+### 2.2 Basis for Aggregate Boundaries
 
-1. **Account 与 Customer 分开**：客户可持有多个账户（`CVACT03Y` 的 1:N 关系），生命周期不同；
-   遗留 `COACTUPC` 同屏更新是 UI 耦合（见 ADR-004）。
-2. **Card 与 Account 分开**：卡是支付工具，账户是信用载体；一账户可多卡（`CVACT02Y` 的
-   `CARD-ACCT-ID`），卡状态与账户状态独立变化。
-3. **TransactionRecord 与 Account 分开**：交易是不可变账本，余额可重算；合并会导致"改余额就改历史"。
-4. **TranCategoryBalance 作为独立聚合**：按 `(账户,类型,类别)` 累计，用于利息计算，更新频率与交易一致
-   但可独立重建。
-5. **AuthorizationCase 与 Account 分开**：授权是"占用额度的请求"，其汇总（PendingAuthSummary）
-   是授权上下文的本地状态；账户余额是已入账事实。两者不能合并，否则实时授权会与批处理互相锁定。
-6. **SecUser 独立**：安全上下文与业务上下文无共享生命周期。
+1. **Account and Customer are separate**: a customer can hold multiple accounts (the 1:N relationship in `CVACT03Y`) and their lifecycles differ;
+   the legacy `COACTUPC` same-screen update is UI coupling (see ADR-004).
+2. **Card and Account are separate**: a card is a payment instrument and an account is the credit vehicle; one account can have multiple
+   cards (`CARD-ACCT-ID` in `CVACT02Y`), and card status and account status change independently.
+3. **TransactionRecord and Account are separate**: transactions form an immutable ledger and the balance can be recomputed; merging them would mean "changing the balance changes history".
+4. **TranCategoryBalance is an independent aggregate**: accumulated by `(account, type, category)` and used for interest calculation; its update
+   frequency matches transactions but it can be rebuilt independently.
+5. **AuthorizationCase and Account are separate**: an authorization is a "request that holds limit", and its summary (PendingAuthSummary)
+   is local state in the authorization context; the account balance is a posted fact. The two cannot be merged, otherwise real-time authorization and batch processing would lock each other.
+6. **SecUser is independent**: the security context and the business contexts share no lifecycle.
 
-## 3. 领域服务与领域事件
+## 3. Domain Services and Domain Events
 
-| 领域服务 | 职责 | 归属上下文 |
+| Domain service | Responsibility | Owning context |
 |---|---|---|
-| `PostingPolicy` | 校验卡号/账户/额度/有效期，产出拒付原因码 100–103 | Transaction |
-| `InterestCalculator` | `累计额 × 年利率 ÷ 1200`（HALF_UP，2 位小数） | Transaction |
-| `AuthorizationPolicy` | 按优先级判定批准/拒绝与原因码 3100–9000 | Authorization |
-| `AvailableCreditCalculator` | 有汇总用 `额度−信用余额`，否则 `额度−当前余额` | Authorization |
+| `PostingPolicy` | Validates card number/account/limit/expiry and produces decline reason codes 100–103 | Transaction |
+| `InterestCalculator` | `accumulated amount × annual rate ÷ 1200` (HALF_UP, 2 decimals) | Transaction |
+| `AuthorizationPolicy` | Decides approve/decline and reason codes 3100–9000 by priority | Authorization |
+| `AvailableCreditCalculator` | Uses `limit − credit balance` when a summary exists, otherwise `limit − current balance` | Authorization |
 
-领域事件（本期以同步调用 + 状态字段表达，未来可外发）：
+Domain events (expressed in this phase as synchronous calls plus status fields; they may be published externally in future):
 
-| 事件 | 触发 | 订阅方（规划） |
+| Event | Trigger | Subscribers (planned) |
 |---|---|---|
-| `TransactionPosted` | 入账成功 | 账户（余额）、报表 |
-| `BillPaymentPosted` | 账单支付成功 | 账户（扣款）、通知 |
-| `AuthorizationDecided` | 授权决策完成 | 风控、报表 |
-| `CardFraudFlagged` | 人工标记欺诈 | 授权（后续拒绝 5100） |
-| `InterestAccrued` | 计息结算 | 账户（余额）、账单 |
+| `TransactionPosted` | Posting succeeded | Account (balance), reporting |
+| `BillPaymentPosted` | Bill payment succeeded | Account (debit), notification |
+| `AuthorizationDecided` | Authorization decision completed | Risk control, reporting |
+| `CardFraudFlagged` | Manual fraud flag | Authorization (subsequent decline 5100) |
+| `InterestAccrued` | Interest settlement | Account (balance), billing |
 
-## 4. 与遗留系统的语义差异（必须显式承认）
+## 4. Semantic Differences from the Legacy System (Must Be Explicitly Acknowledged)
 
-| 差异 | 遗留行为 | 新行为 | 原因 |
+| Difference | Legacy behavior | New behavior | Reason |
 |---|---|---|---|
-| 账户+客户同屏保存 | 一个 CICS 事务写两个文件 | 两个独立 PUT，无跨聚合事务 | 聚合边界（ADR-004） |
-| 无变更提交 | 报错 `No change detected...` | PUT 幂等成功 | HTTP 语义（REST 幂等） |
-| 记录锁 | `READ UPDATE` 长事务锁 | `@Version` 乐观锁 | Web 无会话锁（ADR-006） |
-| 卡维护覆盖 CVV | 重写时 CVV 变空/零 | 保持不变 | 缺陷修复（NR-CARD-01） |
-| 授权原因码 4200/4300/5100/5200 | 死代码，从不触发 | 按业务意图实现 | 补齐语义（BR-AUTH-04..06） |
-| 授权可用额度 | 建汇总后忽略账户当前欠款，额度被放大 | 始终扣除欠款 + 未过期占用 | 信用风险缺陷（NR-AUTH-03） |
-| 过期授权清理 | 不回退信用余额 | 回退并重算汇总 | 额度泄漏缺陷（NR-AUTH-01） |
-| 密码 | 明文、区分大小写失败 | PBKDF2、统一错误 | 安全基线（ADR-008） |
-| 报表输出 | 133 字节打印文件 | JSON + 合计口径 | 排版归报表平台（BR-RPT-05） |
+| Account + customer saved on one screen | One CICS transaction writes two files | Two independent PUTs, no cross-aggregate transaction | Aggregate boundary (ADR-004) |
+| Submit with no changes | Error `No change detected...` | PUT succeeds idempotently | HTTP semantics (REST idempotency) |
+| Record locking | `READ UPDATE` long transaction lock | `@Version` optimistic locking | No session lock on the web (ADR-006) |
+| Card maintenance overwrites the CVV | The CVV becomes empty/zero on rewrite | Left unchanged | Defect fix (NR-CARD-01) |
+| Authorization reason codes 4200/4300/5100/5200 | Dead code, never triggered | Implemented per business intent | Complete the semantics (BR-AUTH-04..06) |
+| Authorization available credit | After a summary is created the current amount owed is ignored, inflating the limit | Always deducts the amount owed + non-expired holds | Credit risk defect (NR-AUTH-03) |
+| Expired authorization purge | Does not roll back the credit balance | Rolls back and recomputes the summary | Limit leakage defect (NR-AUTH-01) |
+| Password | Plaintext, case-sensitivity failures | PBKDF2, uniform errors | Security baseline (ADR-008) |
+| Report output | 133-byte print file | JSON + totals semantics | Layout belongs to the reporting platform (BR-RPT-05) |
 
-## 5. 不变量验证清单（进入编码前）
+## 5. Invariant Verification Checklist (Before Coding)
 
-- [x] 每个聚合根有唯一标识与明确的事务边界
-- [x] 跨聚合写操作已识别（账户+客户、交易+账户、授权+账户）并有编排方案
-- [x] 每条核心业务规则能追溯到遗留证据（见规则目录）
-- [x] 语义差异已记录并说明理由与影响
-- [x] 未解决项（U1–U6）有责任人与临时处置
+- [x] Every aggregate root has a unique identity and a clear transaction boundary
+- [x] Cross-aggregate write operations are identified (account + customer, transaction + account, authorization + account) and have an orchestration plan
+- [x] Every core business rule traces back to legacy evidence (see the rule catalog)
+- [x] Semantic differences are recorded with reasons and impact
+- [x] Unresolved items (U1–U6) have owners and interim handling

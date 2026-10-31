@@ -1,49 +1,49 @@
-# 文档索引
+# Documentation Index
 
-## 1. 存量知识（As-Is）
+## 1. Legacy Knowledge (As-Is)
 
-| 文档 | 内容 |
+| Document | Content |
 |---|---|
-| [legacy/01-codebase-inventory.md](legacy/01-codebase-inventory.md) | 44 个程序、copybook、数据存储、JCL、接口、风险量化 |
-| [legacy/02-five-level-model.md](legacy/02-five-level-model.md) | L1–L5 五层业务模型（每条事实带证据）、迁移影响、BCP、未解决项 |
-| [legacy/03-business-rule-catalog.md](legacy/03-business-rule-catalog.md) | 业务规则目录：遗留证据 → 目标落点 → 实现状态 |
-| [legacy/04-data-dictionary.md](legacy/04-data-dictionary.md) | 14 个逻辑实体的字段级数据字典与枚举 |
-| [legacy/05-ubiquitous-language.md](legacy/05-ubiquitous-language.md) | 统一语言词汇表、术语冲突与消歧 |
+| [legacy/01-codebase-inventory.md](legacy/01-codebase-inventory.md) | 44 programs, copybooks, data stores, JCL, interfaces, risk quantification |
+| [legacy/02-five-level-model.md](legacy/02-five-level-model.md) | L1–L5 five-level business model (every fact with evidence), migration impact, BCP, open items |
+| [legacy/03-business-rule-catalog.md](legacy/03-business-rule-catalog.md) | Business rule catalog: legacy evidence → target landing point → implementation status |
+| [legacy/04-data-dictionary.md](legacy/04-data-dictionary.md) | Field-level data dictionary and enums for the 14 logical entities |
+| [legacy/05-ubiquitous-language.md](legacy/05-ubiquitous-language.md) | Ubiquitous language glossary, terminology conflicts and disambiguation |
 
-## 2. 目标设计（To-Be）
+## 2. Target Design (To-Be)
 
-| 文档 | 内容 |
+| Document | Content |
 |---|---|
-| [design/01-domain-analysis.md](design/01-domain-analysis.md) | 子域划分、聚合与不变量、领域服务/事件、语义差异 |
-| [design/02-bounded-contexts.md](design/02-bounded-contexts.md) | 26 个限界上下文的职责、边界、数据所有权 |
-| [design/03-service-decomposition.md](design/03-service-decomposition.md) | 服务拆分、调用矩阵、失败语义、部署与容量 |
-| [design/04-context-map.md](design/04-context-map.md) | 上下文映射图、集成契约、防腐层 |
-| [design/05-api-catalog.md](design/05-api-catalog.md) | 全部 REST 契约、种子数据契约、错误码总表 |
-| [design/06-traceability-matrix.md](design/06-traceability-matrix.md) | 遗留程序 → 服务 → 接口 → 规则 → 测试 |
-| [design/07-java-conventions.md](design/07-java-conventions.md) | 编码/分层/配置/测试统一基线 |
-| [design/09-scale-up-blueprint.md](design/09-scale-up-blueprint.md) | 规模化蓝图：现状基线、目标服务地图、七阶段路线图 |
-| [design/10-money-path-slice-a1.md](design/10-money-path-slice-a1.md) | 钱路径切片 A1：账户产品化、冻结、过账、总账与对账设计 |
-| [design/11-money-path-slice-a2.md](design/11-money-path-slice-a2.md) | 钱路径切片 A2：过账引擎、总账、试算平衡与前台 |
-| [design/12-reconciliation-and-eod.md](design/12-reconciliation-and-eod.md) | 钱路径切片 A1.4：对账、差异处理与 EOD |
-| [design/13-payments-billing-limits-fx.md](design/13-payments-billing-limits-fx.md) | P2：支付、账单、限额与 FX |
-| [design/14-risk-credit-collections.md](design/14-risk-credit-collections.md) | P3：信贷、欺诈、AML、争议、催收、批处理 |
-| [design/15-operations-support.md](design/15-operations-support.md) | P4：报表、通知、文档、工作流、审计、参考数据 |
-| [design/16-channel-and-quality.md](design/16-channel-and-quality.md) | P5/P6：BFF、搜索、门户、性能、混沌与安全 |
-| [design/adr/README.md](design/adr/README.md) | 11 个架构决策记录（MADR） |
+| [design/01-domain-analysis.md](design/01-domain-analysis.md) | Subdomain decomposition, aggregates and invariants, domain services/events, semantic differences |
+| [design/02-bounded-contexts.md](design/02-bounded-contexts.md) | Responsibilities, boundaries, and data ownership of the 26 bounded contexts |
+| [design/03-service-decomposition.md](design/03-service-decomposition.md) | Service decomposition, invocation matrix, failure semantics, deployment and capacity |
+| [design/04-context-map.md](design/04-context-map.md) | Context map, integration contracts, anti-corruption layer |
+| [design/05-api-catalog.md](design/05-api-catalog.md) | All REST contracts, seed data contracts, consolidated error code list |
+| [design/06-traceability-matrix.md](design/06-traceability-matrix.md) | Legacy program → service → API → rule → test |
+| [design/07-java-conventions.md](design/07-java-conventions.md) | Unified baseline for coding/layering/configuration/testing |
+| [design/09-scale-up-blueprint.md](design/09-scale-up-blueprint.md) | Scale-up blueprint: current baseline, target service map, seven-phase roadmap |
+| [design/10-money-path-slice-a1.md](design/10-money-path-slice-a1.md) | Money path slice A1: account productization, holds, posting, general ledger and reconciliation design |
+| [design/11-money-path-slice-a2.md](design/11-money-path-slice-a2.md) | Money path slice A2: posting engine, general ledger, trial balance and front end |
+| [design/12-reconciliation-and-eod.md](design/12-reconciliation-and-eod.md) | Money path slice A1.4: reconciliation, exception handling and EOD |
+| [design/13-payments-billing-limits-fx.md](design/13-payments-billing-limits-fx.md) | P2: payment, billing, limits and FX |
+| [design/14-risk-credit-collections.md](design/14-risk-credit-collections.md) | P3: credit, fraud, AML, disputes, collections, batch processing |
+| [design/15-operations-support.md](design/15-operations-support.md) | P4: reports, notifications, documents, workflow, audit, reference data |
+| [design/16-channel-and-quality.md](design/16-channel-and-quality.md) | P5/P6: BFF, search, portal, performance, chaos and security |
+| [design/adr/README.md](design/adr/README.md) | 11 architecture decision records (MADR) |
 
-## 3. 运维
+## 3. Operations
 
-| 文档 | 内容 |
+| Document | Content |
 |---|---|
-| [ops/01-docker-runbook.md](ops/01-docker-runbook.md) | 构建、启动、调试、排障、重置、安全缺口 |
-| [ops/02-security-and-performance.md](ops/02-security-and-performance.md) | NFR、压测、混沌、OWASP 核对与安全缺口 |
+| [ops/01-docker-runbook.md](ops/01-docker-runbook.md) | Build, start, debug, troubleshoot, reset, security gaps |
+| [ops/02-security-and-performance.md](ops/02-security-and-performance.md) | NFRs, load testing, chaos, OWASP checklist and security gaps |
 
-## 4. 模拟需求（2026-10）
+## 4. Simulated Requirements (2026-10)
 
-| 文档 | 内容 |
+| Document | Content |
 |---|---|
-| [requirements/README.md](requirements/README.md) | 需求包索引、优先级与排期建议 |
-| [requirements/REQ-2026-001-installment.md](requirements/REQ-2026-001-installment.md) | 账单/消费分期：申请、试算、计划、提前结清 |
-| [requirements/REQ-2026-002-card-loss.md](requirements/REQ-2026-002-card-loss.md) | 信用卡挂失与补卡：自助挂失、补卡工单、进度 |
-| [requirements/REQ-2026-003-limit-increase.md](requirements/REQ-2026-003-limit-increase.md) | 额度调整申请与审批：预审、审批流、SoD |
-| [requirements/REQ-2026-004-dispute.md](requirements/REQ-2026-004-dispute.md) | 交易争议：在线申请、证据、临时入账、chargeback |
+| [requirements/README.md](requirements/README.md) | Requirement pack index, priority and scheduling recommendations |
+| [requirements/REQ-2026-001-installment.md](requirements/REQ-2026-001-installment.md) | Statement/purchase installment: application, preview, schedule, early settlement |
+| [requirements/REQ-2026-002-card-loss.md](requirements/REQ-2026-002-card-loss.md) | Credit card loss reporting and replacement: self-service loss reporting, replacement ticket, progress |
+| [requirements/REQ-2026-003-limit-increase.md](requirements/REQ-2026-003-limit-increase.md) | Limit adjustment request and approval: pre-review, approval flow, SoD |
+| [requirements/REQ-2026-004-dispute.md](requirements/REQ-2026-004-dispute.md) | Transaction dispute: online request, evidence, provisional credit, chargeback |

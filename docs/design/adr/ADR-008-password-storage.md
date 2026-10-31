@@ -1,56 +1,56 @@
-# ADR-008: 密码存储与登录错误语义
+# ADR-008: Password Storage and Login Error Semantics
 
-| 项 | 内容 |
+| Item | Content |
 |----|------|
-| 编号 | ADR-008 |
-| 日期 | 2026-10-25 |
-| 状态 | 已接受 |
-| 关联需求 | BR-SGN-03、BR-USER-03 |
+| ID | ADR-008 |
+| Date | 2026-10-25 |
+| Status | Accepted |
+| Related requirements | BR-SGN-03, BR-USER-03 |
 
-## 背景
+## Context
 
-遗留系统 `SEC-USR-PWD PIC X(8)` 明文存储、明文比较（`CSUSR01Y.cpy:21`、`COSGN00C.cbl:223`），
-且新增用户不转大写而登录转大写，导致含小写字母的密码永远无法登录（`COUSR01C.cbl:157`）。
-新系统不能复制该缺陷，但需保持"8 位定长、由管理员设置"的业务约束。
+The legacy system stores `SEC-USR-PWD PIC X(8)` in plaintext and compares it in plaintext (`CSUSR01Y.cpy:21`, `COSGN00C.cbl:223`),
+and new users are not upper-cased while login input is upper-cased, so a password containing lowercase letters can never be used to log in (`COUSR01C.cbl:157`).
+The new system must not copy this defect, but must keep the business constraint of "8 fixed-length characters, set by an administrator".
 
-## 候选方案
+## Alternatives
 
-| 方案 | 描述 | 优点 | 缺点 |
+| Option | Description | Pros | Cons |
 |---|---|---|---|
-| 方案A：PBKDF2-HMAC-SHA256（JDK 内置） | 每用户随机盐，迭代 210000 次，格式 `pbkdf2$iter$salt$hash` | 无额外依赖；抗暴力破解；可平滑迁移 | 需自行实现校验/编码 |
-| 方案B：BCrypt（spring-security-crypto） | 引入 Spring Security Crypto | 工业标准；实现简单 | 增加依赖；与安全框架版本耦合 |
-| 方案C：保留明文 + 传输加密 | 仅 HTTPS | 迁移零成本 | 严重违规（等保/PCI DSS） |
+| Option A: PBKDF2-HMAC-SHA256 (built into the JDK) | Random per-user salt, 210000 iterations, format `pbkdf2$iter$salt$hash` | No extra dependencies; resistant to brute force; can migrate smoothly | Verification/encoding must be implemented by hand |
+| Option B: BCrypt (spring-security-crypto) | Introduce Spring Security Crypto | Industry standard; simple to implement | Adds a dependency; coupled to the security framework version |
+| Option C: keep plaintext + encrypt transport | HTTPS only | Zero migration cost | Serious violation (MLPS/PCI DSS) |
 
-## 量化权衡表
+## Quantitative Trade-off Table
 
-| 方案 | 实现成本 | 性能开销 | 运维时效 | 审计性 | 风险 |
+| Option | Implementation cost | Performance overhead | Operational agility | Auditability | Risk |
 |---|---|---|---|---|---|
-| A | 低（约 60 行） | 中（单次登录约 100–200ms） | 即时 | 高（算法与迭代次数可审计） | 低 |
-| B | 低 | 中 | 即时 | 高 | 低 |
-| C | 无 | 无 | 即时 | 低 | 极高（合规阻断） |
+| A | Low (about 60 lines) | Medium (about 100–200 ms per login) | Immediate | High (algorithm and iteration count are auditable) | Low |
+| B | Low | Medium | Immediate | High | Low |
+| C | None | None | Immediate | Low | Extremely high (compliance blocker) |
 
-## 决策
+## Decision
 
-采用方案 A（PBKDF2-HMAC-SHA256，210000 次迭代，128 位盐），并做两项改进：
+Adopt Option A (PBKDF2-HMAC-SHA256, 210000 iterations, 128-bit salt) with two improvements:
 
-1. 用户号与密码统一按"原样"比较（不再强制大写），消除遗留的大小写缺陷；用户号入库统一大写。
-2. 登录失败统一返回 `INVALID_CREDENTIALS`（不区分"用户不存在/密码错误"），防止用户枚举，
-   同时在服务端日志中记录具体原因（不含密码）。
+1. User IDs and passwords are compared "as-is" (no more forced upper-casing), eliminating the legacy case defect; user IDs are stored upper-cased.
+2. Failed logins uniformly return `INVALID_CREDENTIALS` (without distinguishing "user does not exist" from "wrong password") to prevent user enumeration,
+   while the specific reason is still recorded in server-side logs (excluding the password).
 
-## 理由
+## Rationale
 
-1. JDK 自带 `SecretKeyFactory("PBKDF2WithHmacSHA256")`，避免为演示引入安全框架。
-2. 8 位定长密码熵有限，必须靠慢哈希 + 盐提升攻击成本。
-3. 统一错误语义是安全基线要求，业务提示文案的变化不影响流程。
+1. The JDK ships `SecretKeyFactory("PBKDF2WithHmacSHA256")`, so no security framework needs to be introduced for the demo.
+2. An 8-character fixed-length password has limited entropy, so a slow hash + salt is required to raise the attack cost.
+3. Uniform error semantics are a security baseline requirement; changes to business prompt wording do not affect the flow.
 
-## 后果（影响与回退路径）
+## Consequences (Impact and Rollback Path)
 
-- 影响：种子用户密码以哈希形式写入 Flyway；登录接口不返回具体失败原因。
-- 回退：若后续引入 Spring Security，可将现有哈希作为 `DelegatingPasswordEncoder` 的自定义编码器，
-  或在上线前统一重置密码。
+- Impact: seed user passwords are written to Flyway as hashes; the login API does not return the specific failure reason.
+- Rollback: if Spring Security is introduced later, the existing hash can be used as a custom encoder in `DelegatingPasswordEncoder`,
+  or passwords can be reset uniformly before go-live.
 
-## 证据
+## Evidence
 
-- `CSUSR01Y.cpy:17-23`（明文 8 位）
+- `CSUSR01Y.cpy:17-23` (plaintext, 8 characters)
 - `COSGN00C.cbl:132-136,221-256`
 - `COUSR01C.cbl:136-157`

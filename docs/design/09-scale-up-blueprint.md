@@ -1,295 +1,295 @@
-# 09 系统规模化蓝图：从 1.6 万行到百万行
+# 09 System Scale-Up Blueprint: From 16K Lines to One Million Lines
 
-> 状态：分析稿（未进入实施）
-> 范围：carddemo-java-1025 全部服务与前端
-> 目标：把当前"可运行的业务切片"演进为覆盖零售银行核心能力的规模化系统
+> Status: analysis draft (not yet in implementation)
+> Scope: all services and the frontend of carddemo-java-1025
+> Goal: evolve the current "runnable business slice" into a scaled system covering the core capabilities of retail banking
 
-## 1. 结论摘要
+## 1. Executive Summary
 
-1. 当前系统是**一条打通主流程的垂直切片**：7 个服务、54 个端点、36 张表、约 1.57 万行 Java（含测试），平均 53 行/文件，属于"薄服务"形态。
-2. 百万行不应作为直接目标。合理的做法是**按银行能力地图补齐业务广度与深度**，代码量是结果而不是 KPI；按本蓝图落地，Java 主代码+测试约 95 万行，前端与脚本约 12 万行，合计约 105 万行。
-3. 复杂度主要来自四个方向：**产品参数化、流程与异常、监管合规、渠道与集成**。单纯增加 CRUD 端点无法产生可维护的规模。
-4. 推荐 7 个阶段推进：平台底座 → 现有 7 服务加深 → 资金与账务 → 信贷与风险 → 运营与报表 → 渠道与多实体 → 规模化收尾。
-5. 首批建议从"账户+交易+支付"这条钱路径开始（见第 13 节），它同时拉动账务、限额、对账、批量与报表，复用率最高。
+1. The current system is **one vertical slice that connects the main flow end to end**: 7 services, 54 endpoints, 36 tables and about 15.7K lines of Java (including tests), averaging 53 lines per file, which is a "thin service" shape.
+2. One million lines should not be a direct target. The sensible approach is to **fill in business breadth and depth along a banking capability map**; line count is an outcome, not a KPI. Executing this blueprint yields roughly 950K lines of Java main code plus tests and about 120K lines of frontend and scripts, roughly 1.05M lines in total.
+3. Complexity comes mainly from four directions: **product parameterization, processes and exceptions, regulatory compliance, and channels and integration**. Simply adding CRUD endpoints cannot produce maintainable scale.
+4. Seven phases are recommended: platform foundation → deepening the existing 7 services → funds and accounting → credit and risk → operations and reporting → channels and multi-entity → scale-up wrap-up.
+5. For the first batch, start with the money path of "account + transaction + payment" (see section 13); it pulls in accounting, limits, reconciliation, batch and reporting at the same time and has the highest reuse.
 
-### 目标规模一览
+### Target Scale at a Glance
 
-| 指标 | 现状 | 目标 | 倍数 |
+| Metric | Current | Target | Multiple |
 |---|---:|---:|---:|
-| Java 文件 | 298 | ~9,000 | 30x |
-| Java 行数（main+test） | 15,717 | ~950,000 | 60x |
-| 前端/脚本/SQL 行数 | ~3,700 | ~120,000 | 32x |
-| REST 端点 | 54 | ~1,000 | 18x |
-| 数据库表 | 36 | ~580 | 16x |
-| 服务/部署单元 | 7 + web-ui | ~26 + 3 个前端 | 4x |
-| 测试用例 | 197 | ~8,000 | 40x |
+| Java files | 298 | ~9,000 | 30x |
+| Java lines (main+test) | 15,717 | ~950,000 | 60x |
+| Frontend/script/SQL lines | ~3,700 | ~120,000 | 32x |
+| REST endpoints | 54 | ~1,000 | 18x |
+| Database tables | 36 | ~580 | 16x |
+| Services/deployment units | 7 + web-ui | ~26 + 3 frontends | 4x |
+| Test cases | 197 | ~8,000 | 40x |
 
-## 2. 现状基线
+## 2. Current Baseline
 
-| 模块 | Java 文件 | Java 行数 | 端点 | 说明 |
+| Module | Java files | Java lines | Endpoints | Notes |
 |---|---:|---:|---:|---|
-| iam-service | 36 | 1,601 | 7 | 登录、用户 CRUD |
-| customer-service | 20 | 1,551 | 4 | 客户 CRUD |
-| card-service | 23 | 1,303 | 5 | 卡片 CRUD、按账户查询 |
-| account-service | 22 | 1,050 | 7 | 账户、入账、还款、利息计提、产品与冻结 |
-| transaction-service | 93 | 4,189 | 10 | 交易查询、入账、利息运行、账单支付 |
-| authorization-service | 46 | 2,660 | 6 | 授权决策、限额、velocity |
-| web-ui | 4 | 241 | - | 静态页面 + 反向代理 |
-| **合计** | **298** | **15,717** | **54** | 36 张表、197 个测试 |
+| iam-service | 36 | 1,601 | 7 | Login, user CRUD |
+| customer-service | 20 | 1,551 | 4 | Customer CRUD |
+| card-service | 23 | 1,303 | 5 | Card CRUD, lookup by account |
+| account-service | 22 | 1,050 | 7 | Accounts, posting, repayment, interest accrual, products and holds |
+| transaction-service | 93 | 4,189 | 10 | Transaction query, posting, interest run, bill payment |
+| authorization-service | 46 | 2,660 | 6 | Authorization decisions, limits, velocity |
+| web-ui | 4 | 241 | - | Static pages + reverse proxy |
+| **Total** | **298** | **15,717** | **54** | 36 tables, 197 tests |
 
-> 上表为规模化分析时的快照。A1.1–A1.4、P2、P3–P5 落地后：全仓 48,374 行 Java / 903 个文件 / 762 个测试，
-> 26 个业务服务 + web-ui；默认 16 个容器，`--profile extended` 追加 12 个扩展服务。
+> The table above is a snapshot taken during the scale-up analysis. After A1.1–A1.4, P2 and P3–P5 landed: 48,374 lines of Java / 903 files / 762 tests
+> across the repository, 26 business services + web-ui; 16 containers by default, with `--profile extended` adding 12 extension services.
 
-补充事实：
+Supporting facts:
 
-- 代码密度 53 行/文件，典型企业 Java 服务为 100–150 行/文件，说明当前大量文件只是"一层壳"。
-- 领域规则集中在少数几个聚合，缺少产品目录、费率、限额、账务分录、批处理、对账等银行系统必备结构。
-- 已有较好的工程基础：DDD 分层、Flyway、幂等键、统一错误码、Docker Compose、197 个测试，这些应保留并强化。
+- Code density is 53 lines per file, whereas a typical enterprise Java service has 100–150 lines per file, showing that many current files are just "a shell".
+- Domain rules are concentrated in a few aggregates; structures essential to banking systems such as a product catalog, rates, limits, accounting entries, batch processing and reconciliation are missing.
+- There is already a decent engineering foundation: DDD layering, Flyway, idempotency keys, uniform error codes, Docker Compose and 197 tests; these should be kept and strengthened.
 
-## 3. 度量口径与原则
+## 3. Measurement Definitions and Principles
 
-### 3.1 口径
+### 3.1 Definitions
 
-- LOC 统计 `src/main` + `src/test` 的 Java 代码，不含生成代码、依赖与构建产物。
-- 辅助指标：业务规则数、聚合数、领域事件数、端点、表、测试用例、端到端场景。
-- 每个能力必须能追溯到需求/规则编号（延续现有 `MK-ELI-*` 风格），避免"为行数写代码"。
+- LOC counts Java code in `src/main` + `src/test`, excluding generated code, dependencies and build artifacts.
+- Supporting metrics: number of business rules, aggregates, domain events, endpoints, tables, test cases and end-to-end scenarios.
+- Every capability must trace back to a requirement/rule ID (continuing the existing `MK-ELI-*` style) to avoid "writing code for line count".
 
-### 3.2 原则
+### 3.2 Principles
 
-1. **业务驱动**：每一行代码对应一个产品参数、规则、状态迁移、异常路径或集成契约。
-2. **垂直切片**：每个增量同时交付 领域模型 + API + 迁移 + 测试 + 文档 +（必要时）UI。
-3. **可运行**：任一阶段结束时 `docker compose up` 可用、测试全绿、演示脚本可跑通。
-4. **不过度拆分**：服务边界按限界上下文，不按表拆分；共享能力沉淀为库或平台服务。
-5. **质量门槛**：ArchUnit 分层校验、契约测试、覆盖率门槛、静态扫描，随规模同步建设。
+1. **Business-driven**: every line of code corresponds to a product parameter, rule, state transition, exception path or integration contract.
+2. **Vertical slice**: each increment delivers the domain model + API + migration + tests + documentation + (when needed) UI at the same time.
+3. **Runnable**: at the end of any phase `docker compose up` works, all tests are green and the demo script runs through.
+4. **No over-decomposition**: service boundaries follow bounded contexts, not tables; shared capabilities settle into libraries or platform services.
+5. **Quality gates**: ArchUnit layering checks, contract tests, coverage thresholds and static analysis, built up alongside the scale.
 
-## 4. 复杂度的四个来源
+## 4. The Four Sources of Complexity
 
-### 4.1 产品维度
+### 4.1 Product Dimension
 
-银行系统的规模首先来自"产品参数化"：
+The scale of a banking system comes first from "product parameterization":
 
-- 账户：活期、储蓄、定期、货币市场、多币种子账户；透支额度与分层利率；最低余额、月费、免费笔数。
-- 卡片：借记/信用/预付、联名卡、虚拟卡、附属卡；额度、取现限额、商户类别限制、地区限制。
-- 贷款：个人贷、车贷、房贷、循环额度；利率类型、还款方式（等额本息/等额本金/气球）、罚息、提前还款。
-- 存款：定期产品、利率档位、自动转存、提前支取罚息。
+- Accounts: current, savings, time deposit, money market, multi-currency sub-accounts; overdraft limits and tiered rates; minimum balance, monthly fee, free transaction count.
+- Cards: debit/credit/prepaid, co-branded, virtual, supplementary; limits, cash advance limits, merchant category restrictions, regional restrictions.
+- Loans: personal, auto, mortgage, revolving credit; rate types, repayment methods (equal installment/equal principal/balloon), penalty interest, early repayment.
+- Deposits: term products, rate tiers, automatic renewal, early withdrawal penalties.
 
-每个产品都是一组可配置参数 + 规则 + 生命周期，而不是一个枚举值。
+Each product is a set of configurable parameters + rules + lifecycle, not an enum value.
 
-### 4.2 流程维度
+### 4.2 Process Dimension
 
-- 生命周期状态机：申请→审批→激活→冻结→销户；卡片新发→激活→挂失→补卡→销卡。
-- 异常路径：冲正、退回、部分成功、超时未知、重复提交、跨日切账。
-- 人工干预：maker-checker、调账、豁免、争议举证、催收承诺。
-- 批量：计息、扣费、账单、还款提醒、逾期滚动、总账结转、对账。
-- 调度：EOD 日历、依赖图、断点续跑、重跑幂等。
+- Lifecycle state machines: application → approval → activation → hold → account closure; card issuance → activation → loss reporting → replacement → card closure.
+- Exception paths: reversal, return, partial success, unknown timeout, duplicate submission, cross-day cutoff.
+- Manual intervention: maker-checker, adjustments, waivers, dispute evidence, collection promises.
+- Batch: interest accrual, fee charging, statements, repayment reminders, delinquency roll, general ledger transfer, reconciliation.
+- Scheduling: EOD calendar, dependency graph, restart from checkpoint, idempotent re-runs.
 
-### 4.3 监管维度
+### 4.3 Regulatory Dimension
 
-- KYC/CIP：身份核验、证件有效期、风险评级、受益所有人。
-- AML/制裁：名单筛查、交易监测场景、警报处置、SAR 上报。
-- 消费者保护：争议处理时限、账单披露、费用透明、投诉留痕。
-- 数据：留存期限、审计不可篡改、PII 脱敏、跨境数据限制。
-- 报表：监管报送、总账试算、风险暴露、流动性指标。
+- KYC/CIP: identity verification, document expiry, risk rating, beneficial owners.
+- AML/sanctions: list screening, transaction monitoring scenarios, alert handling, SAR filing.
+- Consumer protection: dispute handling deadlines, statement disclosure, fee transparency, complaint audit trail.
+- Data: retention periods, tamper-proof audit, PII masking, cross-border data restrictions.
+- Reporting: regulatory submissions, general ledger trial balance, risk exposure, liquidity metrics.
 
-### 4.4 渠道与集成
+### 4.4 Channels and Integration
 
-- 支付：ISO 20022（pain.001/pacs.008/pacs.002）、SWIFT MT103/MT202、SEPA、ACH/NACHA、RTP/FedNow、卡组织清算。
-- 文件：批量代发、对账文件、回单、SFTP 收发文与格式校验。
-- 开放银行：OAuth2/OIDC、同意管理、账户信息与支付发起。
-- 内部：事件总线、同步查询、批处理、报表抽取。
+- Payments: ISO 20022 (pain.001/pacs.008/pacs.002), SWIFT MT103/MT202, SEPA, ACH/NACHA, RTP/FedNow, card network settlement.
+- Files: bulk disbursement, reconciliation files, receipts, SFTP send/receive with format validation.
+- Open banking: OAuth2/OIDC, consent management, account information and payment initiation.
+- Internal: event bus, synchronous queries, batch processing, reporting extracts.
 
-## 5. 目标领域地图
+## 5. Target Domain Map
 
-| 分层 | 子域 | 承载服务 |
+| Layer | Subdomain | Hosting services |
 |---|---|---|
-| Core | 账户与存款 | account-service |
-| Core | 卡片与授权 | card-service、authorization-service |
-| Core | 支付与转账 | payment-service、transaction-service |
-| Core | 信贷 | loan-service、credit-service（可合并） |
-| Core | 账务与总账 | ledger-service |
-| Core | 账单与计费 | billing-service |
-| Core | 风险与反欺诈 | fraud-service、aml-service |
-| Supporting | 客户与 KYC | customer-service |
-| Supporting | 对账与运营 | reconciliation-service、batch-service、reporting-service |
-| Supporting | 争议与催收 | dispute-service、collections-service |
-| Supporting | 通知与文档 | notification-service、document-service |
-| Supporting | 报表与分析 | reporting-service |
-| Supporting | 批处理与 EOD | batch-service |
-| Supporting | 流程与规则 | workflow-service、rules-service |
-| Supporting | 限额、定价、对账 | limit-service、reference-data-service、reconciliation-service |
-| Generic | 身份与访问 | iam-service |
-| Generic | 接入与 BFF | api-gateway、web-admin、customer-portal |
-| Generic | 审计与检索 | audit-service、search（OpenSearch） |
+| Core | Accounts and deposits | account-service |
+| Core | Cards and authorization | card-service, authorization-service |
+| Core | Payments and transfers | payment-service, transaction-service |
+| Core | Credit | loan-service, credit-service (can be merged) |
+| Core | Accounting and general ledger | ledger-service |
+| Core | Statements and billing | billing-service |
+| Core | Risk and anti-fraud | fraud-service, aml-service |
+| Supporting | Customer and KYC | customer-service |
+| Supporting | Reconciliation and operations | reconciliation-service, batch-service, reporting-service |
+| Supporting | Disputes and collections | dispute-service, collections-service |
+| Supporting | Notifications and documents | notification-service, document-service |
+| Supporting | Reporting and analytics | reporting-service |
+| Supporting | Batch processing and EOD | batch-service |
+| Supporting | Workflow and rules | workflow-service, rules-service |
+| Supporting | Limits, pricing, reconciliation | limit-service, reference-data-service, reconciliation-service |
+| Generic | Identity and access | iam-service |
+| Generic | Access and BFF | api-gateway, web-admin, customer-portal |
+| Generic | Audit and search | audit-service, search (OpenSearch) |
 
-## 6. 目标服务清单与规模估算
+## 6. Target Service Inventory and Size Estimates
 
-> LOC 为目标值（main+test），含领域、应用、基础设施、接口与测试；不含生成代码。
+> LOC are target values (main+test) covering domain, application, infrastructure, interfaces and tests; generated code is excluded.
 
-| 服务 | 现状 LOC | 目标能力增量 | 目标 LOC | 端点 | 表 |
+| Service | Current LOC | Target capability increments | Target LOC | Endpoints | Tables |
 |---|---:|---|---:|---:|---:|
-| iam-service | 1,601 | OAuth2/OIDC、MFA、RBAC/ABAC、会话与设备、密码策略、API 客户端 | 25,000 | 25 | 20 |
-| customer-service | 1,551 | CIF、KYC/CIP、证件、地址、关系人、同意书、分群、风险评级 | 40,000 | 45 | 30 |
-| card-service | 1,303 | 产品目录、发卡/制卡、PIN、生命周期、卡控、额度、tokenization、续卡/补卡 | 50,000 | 55 | 35 |
-| account-service | 1,050 | 产品参数、透支、冻结/预留、计息、费用、对账单、销户、多币种 | 60,000 | 60 | 40 |
-| transaction-service | 4,189 | 30+ 交易类型、过账引擎、转账、standing order、bill pay、冲正、定时任务 | 70,000 | 70 | 45 |
-| authorization-service | 2,660 | 决策流水线、velocity、限额、欺诈评分、3DS、部分批准、stand-in | 45,000 | 35 | 25 |
-| reconciliation-service | 1,800 | 对账/EOD、差异处理、补偿 | 45,000 | 35 | 30 |
-| payment-service | 新增 | ACH/SEPA/电汇/RTP、ISO 20022、SWIFT、截止时间、退汇、筛查 | 80,000 | 80 | 50 |
-| ledger-service | 新增 | 科目表、日记账、过账规则、期间关账、试算平衡、子账对账 | 45,000 | 35 | 30 |
-| billing-service | 新增 | 账单周期、利率/APR、最低还款、费用、账单生成、宽限期、滞纳金 | 45,000 | 40 | 30 |
-| loan-service | 新增 | 申请、评分、额度、摊销计划、放款、还款、提前还款、逾期移交 | 60,000 | 55 | 40 |
-| fraud-service | 新增 | 规则/评分、velocity、设备指纹、案件管理、警报 | 35,000 | 30 | 20 |
-| aml-service | 新增 | 制裁/PEP 筛查、监测场景、警报、SAR 工作流 | 30,000 | 30 | 20 |
-| dispute-service | 新增 | 争议原因码、chargeback 生命周期、临时入账、举证、仲裁 | 30,000 | 35 | 20 |
-| collections-service | 新增 | 逾期分桶、催收策略、PTP、还款计划、减免、 hardship | 30,000 | 30 | 20 |
-| notification-service | 新增 | 模板、邮件/短信/推送、偏好、重试、送达回执 | 20,000 | 25 | 12 |
-| document-service | 新增 | 账单 PDF、合同、电子签、归档、留存策略 | 20,000 | 20 | 12 |
-| reporting-service | 新增 | 监管报表、经营看板、抽取、数据集市、导出 | 50,000 | 40 | 25 |
-| batch-service | 新增 | 作业图、EOD 日历、依赖、断点、重跑、文件收发 | 35,000 | 20 | 15 |
-| workflow-service | 新增 | 流程定义、任务、审批、SLA、升级、maker-checker | 25,000 | 30 | 15 |
-| rules-service | 新增 | 决策表、DSL、版本、灰度、模拟 | 25,000 | 25 | 12 |
-| limit-service | 新增 | 客户/账户/渠道/产品限额、用量计数、临时提额 | 15,000 | 20 | 8 |
-| reference-data-service | 新增 | 币种、国家、假日、汇率、产品目录、费率表 | 15,000 | 25 | 10 |
-| reconciliation-service | 新增 | 总账/子账、网络清算、差异管理、调账 | 25,000 | 20 | 12 |
-| audit-service | 新增 | 不可篡改日志、检索、留存、导出 | 15,000 | 15 | 6 |
-| api-gateway / BFF | 新增 | 路由、鉴权、限流、聚合、渠道适配 | 30,000 | 50 | 5 |
-| web-admin / customer-portal | 241 | 运营后台、客户门户、移动端 API、组件库 | 120,000* | - | - |
-| **合计** | **15,717** | | **~955,000** | **~965** | **~582** |
+| iam-service | 1,601 | OAuth2/OIDC, MFA, RBAC/ABAC, sessions and devices, password policy, API clients | 25,000 | 25 | 20 |
+| customer-service | 1,551 | CIF, KYC/CIP, documents, addresses, related parties, consents, segmentation, risk rating | 40,000 | 45 | 30 |
+| card-service | 1,303 | Product catalog, issuance/embossing, PIN, lifecycle, card controls, limits, tokenization, renewal/replacement | 50,000 | 55 | 35 |
+| account-service | 1,050 | Product parameters, overdraft, holds/reservations, interest, fees, statements, account closure, multi-currency | 60,000 | 60 | 40 |
+| transaction-service | 4,189 | 30+ transaction types, posting engine, transfers, standing orders, bill pay, reversal, scheduled jobs | 70,000 | 70 | 45 |
+| authorization-service | 2,660 | Decision pipeline, velocity, limits, fraud scoring, 3DS, partial approval, stand-in | 45,000 | 35 | 25 |
+| reconciliation-service | 1,800 | Reconciliation/EOD, discrepancy handling, compensation | 45,000 | 35 | 30 |
+| payment-service | New | ACH/SEPA/wire/RTP, ISO 20022, SWIFT, cut-off times, returns, screening | 80,000 | 80 | 50 |
+| ledger-service | New | Chart of accounts, journal entries, posting rules, period closing, trial balance, sub-ledger reconciliation | 45,000 | 35 | 30 |
+| billing-service | New | Billing cycles, rates/APR, minimum payment, fees, statement generation, grace period, late fees | 45,000 | 40 | 30 |
+| loan-service | New | Application, scoring, limits, amortization schedule, disbursement, repayment, early repayment, delinquency handover | 60,000 | 55 | 40 |
+| fraud-service | New | Rules/scoring, velocity, device fingerprinting, case management, alerts | 35,000 | 30 | 20 |
+| aml-service | New | Sanctions/PEP screening, monitoring scenarios, alerts, SAR workflow | 30,000 | 30 | 20 |
+| dispute-service | New | Dispute reason codes, chargeback lifecycle, provisional credit, evidence, arbitration | 30,000 | 35 | 20 |
+| collections-service | New | Delinquency bucketing, collections strategy, PTP, repayment plans, waivers, hardship | 30,000 | 30 | 20 |
+| notification-service | New | Templates, email/SMS/push, preferences, retries, delivery receipts | 20,000 | 25 | 12 |
+| document-service | New | Statement PDFs, contracts, e-signature, archiving, retention policies | 20,000 | 20 | 12 |
+| reporting-service | New | Regulatory reports, business dashboards, extracts, data marts, exports | 50,000 | 40 | 25 |
+| batch-service | New | Job graphs, EOD calendar, dependencies, checkpoints, re-runs, file transfer | 35,000 | 20 | 15 |
+| workflow-service | New | Workflow definitions, tasks, approvals, SLA, escalation, maker-checker | 25,000 | 30 | 15 |
+| rules-service | New | Decision tables, DSL, versions, canary release, simulation | 25,000 | 25 | 12 |
+| limit-service | New | Customer/account/channel/product limits, usage counters, temporary limit increase | 15,000 | 20 | 8 |
+| reference-data-service | New | Currencies, countries, holidays, FX rates, product catalog, rate tables | 15,000 | 25 | 10 |
+| reconciliation-service | New | General ledger/sub-ledger, network settlement, discrepancy management, adjustments | 25,000 | 20 | 12 |
+| audit-service | New | Tamper-proof logs, search, retention, export | 15,000 | 15 | 6 |
+| api-gateway / BFF | New | Routing, authentication, rate limiting, aggregation, channel adaptation | 30,000 | 50 | 5 |
+| web-admin / customer-portal | 241 | Operations back office, customer portal, mobile API, component library | 120,000* | - | - |
+| **Total** | **15,717** | | **~955,000** | **~965** | **~582** |
 
-\* 前端 12 万行为 JS/TS/HTML/CSS，不计入 Java 行数。
+\* The 120K frontend lines are JS/TS/HTML/CSS and are not counted in the Java lines.
 
-## 7. 平台能力（横向）
+## 7. Platform Capabilities (Cross-Cutting)
 
-规模化的前提是横向能力复用，否则 26 个服务会变成 26 套重复实现。
+Scale-up presupposes cross-cutting reuse; otherwise 26 services become 26 duplicate implementations.
 
-### 7.1 事件与一致性
+### 7.1 Events and Consistency
 
-- Kafka 或 RabbitMQ 作为事件总线；每个服务一张 outbox 表，事务内写业务+事件。
-- 消费者幂等表、DLQ、重放工具、事件 schema 版本管理。
-- Saga 编排（支付、转账、争议）与补偿动作；同步调用只用于查询。
+- Kafka or RabbitMQ as the event bus; each service has an outbox table that writes business data + events in the same transaction.
+- Consumer idempotency tables, DLQ, replay tooling, event schema versioning.
+- Saga orchestration (payments, transfers, disputes) with compensating actions; synchronous calls are used only for queries.
 
-### 7.2 接入与安全
+### 7.2 Access and Security
 
-- API Gateway：路由、OAuth2 resource server、限流、配额、请求签名、渠道标识。
-- 字段级加密（PAN、证件号）、日志脱敏、PII 访问审计。
-- maker-checker、职责分离、操作留痕。
+- API Gateway: routing, OAuth2 resource server, rate limiting, quotas, request signing, channel identification.
+- Field-level encryption (PAN, document numbers), log masking, PII access auditing.
+- Maker-checker, segregation of duties, operation audit trail.
 
-### 7.3 规则与流程
+### 7.3 Rules and Workflow
 
-- 规则服务：决策表 + DSL，支持版本、灰度、模拟运行；授权、资格、限额、费率共用。
-- 流程服务：审批流、任务箱、SLA 与升级；调额、退款、争议、销户等复用。
+- Rules service: decision tables + DSL with versioning, canary release and simulation; shared by authorization, eligibility, limits and rates.
+- Workflow service: approval flows, task inbox, SLA and escalation; reused for limit changes, refunds, disputes and account closure.
 
-### 7.4 批处理与文件
+### 7.4 Batch Processing and Files
 
-- Spring Batch + 调度器；作业图、依赖、断点、重跑幂等、失败告警。
-- EOD 日历（假日表）、 cut-off 时间、跨日切账。
-- SFTP 文件网关：收文校验、格式转换、回执、归档。
+- Spring Batch + scheduler; job graphs, dependencies, checkpoints, idempotent re-runs, failure alerts.
+- EOD calendar (holiday table), cut-off times, cross-day cutoff.
+- SFTP file gateway: inbound validation, format conversion, acknowledgements, archiving.
 
-### 7.5 报表与数据
+### 7.5 Reporting and Data
 
-- 各服务写 read model；reporting-service 汇总；必要时引入 ClickHouse/数仓。
-- 监管报表模板化；经营看板；数据导出与权限控制。
-- 数据保留、分区、归档策略。
+- Each service writes a read model; reporting-service aggregates; ClickHouse/a data warehouse is introduced when needed.
+- Templated regulatory reports; business dashboards; data export with permission control.
+- Data retention, partitioning and archiving policies.
 
-### 7.6 可观测与运维
+### 7.6 Observability and Operations
 
-- Micrometer + Prometheus + Grafana；OpenTelemetry 链路；结构化日志与 traceId。
-- 健康检查、就绪探针、熔断、超时、重试预算。
-- 每服务一份 runbook；关键告警阈值。
+- Micrometer + Prometheus + Grafana; OpenTelemetry traces; structured logs with traceId.
+- Health checks, readiness probes, circuit breakers, timeouts, retry budgets.
+- One runbook per service; threshold alerts for key metrics.
 
-### 7.7 搜索与缓存
+### 7.7 Search and Caching
 
-- OpenSearch：客户、交易、争议全文检索。
-- Redis：velocity 计数、会话、限额用量、分布式锁。
+- OpenSearch: full-text search over customers, transactions and disputes.
+- Redis: velocity counters, sessions, limit usage, distributed locks.
 
-## 8. 数据规模
+## 8. Data Scale
 
-| 项 | 现状 | 目标 |
+| Item | Current | Target |
 |---|---:|---:|
-| 数据库实例 | 7 | ~22 |
-| 表 | 36 | ~580 |
-| Flyway 迁移脚本 | ~10 | ~250 |
-| 读模型/物化视图 | 0 | ~40 |
-| 演示数据 | 少量种子 | 1 万客户 / 5 万账户 / 100 万交易 |
+| Database instances | 7 | ~22 |
+| Tables | 36 | ~580 |
+| Flyway migration scripts | ~10 | ~250 |
+| Read models/materialized views | 0 | ~40 |
+| Demo data | A small set of seeds | 10K customers / 50K accounts / 1M transactions |
 
-演示数据生成器应成为一等公民：既支撑 UI 演示，也支撑报表、性能测试与批量作业验证。
+The demo data generator should be a first-class citizen: it supports UI demos as well as reporting, performance testing and batch job validation.
 
-## 9. 工程规模
+## 9. Engineering Scale
 
-- Maven 模块 30+；共享库：`common-domain`、`common-events`、`common-security`、`common-observability`、`test-support`。
-- OpenAPI 优先：契约生成 DTO 与客户端，减少手写映射；MapStruct 处理聚合↔DTO。
-- 测试金字塔：单元 ~6,000、集成（Testcontainers）~1,500、契约 ~300、端到端 ~100、性能场景 ~30。
-- ArchUnit 校验分层与依赖方向；Checkstyle/SpotBugs/PMD；覆盖率门槛按模块设定。
-- 文档：C4 模型、ADRs（目标 30+）、API 目录、事件目录、数据字典、每服务 runbook。
-- CI：并行构建、依赖缓存、镜像分层、按变更集选择测试。
+- 30+ Maven modules; shared libraries: `common-domain`, `common-events`, `common-security`, `common-observability`, `test-support`.
+- OpenAPI-first: contracts generate DTOs and clients to reduce hand-written mapping; MapStruct handles aggregate ↔ DTO.
+- Test pyramid: ~6,000 unit, ~1,500 integration (Testcontainers), ~300 contract, ~100 end-to-end, ~30 performance scenarios.
+- ArchUnit validates layering and dependency direction; Checkstyle/SpotBugs/PMD; coverage thresholds set per module.
+- Documentation: C4 models, ADRs (target 30+), API catalog, event catalog, data dictionary, per-service runbook.
+- CI: parallel builds, dependency caching, layered images, change-set based test selection.
 
-## 10. 分阶段路线图
+## 10. Phased Roadmap
 
-| 阶段 | 主题 | 累计 LOC | 端点 | 表 | 关键交付 |
+| Phase | Theme | Cumulative LOC | Endpoints | Tables | Key deliverables |
 |---|---|---:|---:|---:|---|
-| P0 | 平台底座与工程骨架 | 25k | 60 | 40 | 共享库、事件总线+outbox、网关骨架、测试/契约/ArchUnit、数据生成器 |
-| P1 | 现有 7 服务加深 | 110k | 180 | 90 | 产品参数、账户透支/冻结/费用、交易类型与冲正、授权规则、卡生命周期、KYC、RBAC/MFA |
-| P2 | 资金与账务 | 250k | 380 | 200 | payment、ledger、billing、limit、FX、reconciliation；ISO 20022 与批量文件 |
-| P3 | 信贷与风险 | 400k | 560 | 300 | loan、credit、fraud、aml、dispute、collections |
-| P4 | 运营与报表 | 560k | 720 | 400 | batch/EOD、reporting、document、notification、workflow、audit、reference-data |
-| P5 | 渠道与多实体 | 780k | 880 | 500 | gateway/BFF、运营后台、客户门户、搜索、多币种/多实体、性能优化 |
-| P6 | 规模化收尾 | 1.0M | 1,000 | 580 | 监管报表、弹性与混沌、全链路压测、文档与培训、覆盖率收口 |
+| P0 | Platform foundation and engineering skeleton | 25k | 60 | 40 | Shared libraries, event bus + outbox, gateway skeleton, tests/contracts/ArchUnit, data generator |
+| P1 | Deepen the existing 7 services | 110k | 180 | 90 | Product parameters, account overdraft/holds/fees, transaction types and reversal, authorization rules, card lifecycle, KYC, RBAC/MFA |
+| P2 | Funds and accounting | 250k | 380 | 200 | payment, ledger, billing, limit, FX, reconciliation; ISO 20022 and batch files |
+| P3 | Credit and risk | 400k | 560 | 300 | loan, credit, fraud, aml, dispute, collections |
+| P4 | Operations and reporting | 560k | 720 | 400 | batch/EOD, reporting, document, notification, workflow, audit, reference-data |
+| P5 | Channels and multi-entity | 780k | 880 | 500 | gateway/BFF, back office, customer portal, search, multi-currency/multi-entity, performance tuning |
+| P6 | Scale-up wrap-up | 1.0M | 1,000 | 580 | Regulatory reporting, resilience and chaos, full-chain load testing, documentation and training, coverage closure |
 
-### 各阶段退出标准
+### Phase Exit Criteria
 
-- P0：任一服务可通过模板生成；事件发布/消费有集成测试；`mvn verify` 全绿。
-- P1：现有 UI 全部迁移到新模型；核心规则有编号与测试；无跨服务直连数据库。
-- P2：一笔跨行转账可完成"受理→筛查→过账→总账→对账→回单"全链路。
-- P3：高风险交易可触发欺诈警报；逾期账户进入催收；争议可完成 chargeback 生命周期。
-- P4：EOD 可一键跑完计息、账单、扣费、总账结转；报表可导出。
-- P5：两个渠道（后台/门户）共用 BFF；多币种账户可开户、入账、换汇。
-- P6：核心场景压测达标；故障注入可恢复；审计可追溯。
+- P0: any service can be generated from a template; event publishing/consumption has integration tests; `mvn verify` is fully green.
+- P1: all existing UI is migrated to the new model; core rules have IDs and tests; no service connects directly to another's database.
+- P2: a single interbank transfer completes the full chain "intake → screening → posting → general ledger → reconciliation → receipt".
+- P3: high-risk transactions trigger fraud alerts; delinquent accounts enter collections; disputes complete the chargeback lifecycle.
+- P4: EOD runs interest accrual, statements, fee charging and general ledger transfer with one command; reports can be exported.
+- P5: two channels (back office/portal) share the BFF; multi-currency accounts can be opened, posted and converted.
+- P6: core-scenario load tests meet targets; fault injection is recoverable; audit is traceable.
 
-## 11. 工作量与节奏
+## 11. Effort and Cadence
 
-- 行业经验：企业 Java 含测试与文档约 8,000–15,000 行/人月；100 万行约 70–120 人月。
-- AI 辅助可显著压缩编码时间，但评审、联调、数据与测试仍需投入；按每 2 周一个垂直切片推进，单阶段约 4–8 个切片。
-- 建议以"能力"而非"行数"排期：每个切片交付可演示的业务场景 + 测试 + 文档。
-- 需同步关注构建时间：模块化 + 并行构建 + 测试分片，避免 30 模块后 `mvn test` 不可用。
+- Industry experience: enterprise Java including tests and documentation is about 8,000–15,000 lines per person-month; 1M lines is roughly 70–120 person-months.
+- AI assistance can significantly compress coding time, but review, integration, data and testing still require investment; advancing one vertical slice every 2 weeks gives about 4–8 slices per phase.
+- Schedule by "capability" rather than "line count": each slice delivers a demonstrable business scenario + tests + documentation.
+- Watch build time in parallel: modularization + parallel builds + test sharding, so `mvn test` does not become unusable past 30 modules.
 
-## 12. 风险与反模式
+## 12. Risks and Anti-Patterns
 
-1. **为行数而写代码**：复制粘贴 CRUD、死代码、无业务含义的 DTO 转换，短期涨行数、长期不可维护。
-2. **分布式单体**：服务间强耦合、共享数据库、同步调用链过长。
-3. **缺少一致性设计**：跨服务写操作没有 outbox/saga，账务与业务状态不一致。
-4. **合规后补**：审计、留存、脱敏、maker-checker 后期补做成本极高。
-5. **测试债务**：只写 happy path，规模上去后回归不可控。
-6. **过度拆分**：每个表一个服务，运维与联调成本爆炸。
-7. **演示数据失真**：数据量太小，报表、性能、批量问题暴露不出来。
-8. **文档滞后**：服务、事件、表、接口没有目录，人员更替后不可维护。
+1. **Writing code for line count**: copy-paste CRUD, dead code, DTO conversions with no business meaning — they inflate the count short-term and are unmaintainable long-term.
+2. **Distributed monolith**: tight coupling between services, shared databases, overly long synchronous call chains.
+3. **Missing consistency design**: cross-service writes without outbox/saga leave accounting and business state inconsistent.
+4. **Compliance bolted on later**: retrofitting audit, retention, masking and maker-checker is extremely expensive.
+5. **Test debt**: writing only the happy path makes regression uncontrollable once the scale grows.
+6. **Over-decomposition**: one service per table explodes operations and integration costs.
+7. **Unrealistic demo data**: too little data hides reporting, performance and batch problems.
+8. **Stale documentation**: without catalogs of services, events, tables and interfaces, maintenance breaks down when people change.
 
-## 13. 建议的首批切片
+## 13. Recommended First Slices
 
-### 方案 A：钱路径（推荐）
+### Option A: Money Path (recommended)
 
-账户产品化 → 交易过账引擎 → 支付受理/清算 → 总账 → 对账。
+Account productization → transaction posting engine → payment intake/settlement → general ledger → reconciliation.
 
-- 拉动：account、transaction、payment、ledger、limit、reference-data、reconciliation、batch。
-- 价值：一条可演示的跨行转账全链路，复用面最广。
+- Pulls in: account, transaction, payment, ledger, limit, reference-data, reconciliation, batch.
+- Value: a demonstrable end-to-end interbank transfer chain with the broadest reuse.
 
-### 方案 B：实时风险
+### Option B: Real-Time Risk
 
-卡片生命周期 → 授权决策流水线 → 限额/velocity → 欺诈评分 → 3DS。
+Card lifecycle → authorization decision pipeline → limits/velocity → fraud scoring → 3DS.
 
-- 拉动：card、authorization、fraud、limit、rules、notification。
-- 价值：实时决策场景，技术挑战高，但依赖支付与账务较少。
+- Pulls in: card, authorization, fraud, limit, rules, notification.
+- Value: real-time decisioning scenarios with high technical challenge but little dependency on payments and accounting.
 
-### 方案 C：合规与客户
+### Option C: Compliance and Customer
 
-KYC/CIP → 制裁筛查 → 交易监测 → 争议/催收。
+KYC/CIP → sanctions screening → transaction monitoring → disputes/collections.
 
-- 拉动：customer、aml、dispute、collections、workflow、document。
-- 价值：监管故事完整，但缺少资金流，演示效果偏弱。
+- Pulls in: customer, aml, dispute, collections, workflow, document.
+- Value: a complete regulatory story, but it lacks money flow and demos less well.
 
-建议顺序：A → B → C，先把钱路径与账务打通，再做实时风险，最后补合规运营。
+Recommended order: A → B → C — connect the money path and accounting first, then real-time risk, and finally compliance operations.
 
-## 14. 下一步
+## 14. Next Steps
 
-1. 确认首批切片与优先级。
-2. 输出 P0/P1 的详细设计：服务清单、聚合、事件、表、API、验收场景。
-3. 按垂直切片实施，每个切片保持测试全绿、Compose 可运行、文档同步。
+1. Confirm the first slices and their priorities.
+2. Produce the detailed P0/P1 design: service inventory, aggregates, events, tables, APIs, acceptance scenarios.
+3. Implement by vertical slice, keeping tests fully green, Compose runnable and documentation in sync for every slice.

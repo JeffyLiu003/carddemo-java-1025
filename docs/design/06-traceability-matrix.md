@@ -1,86 +1,86 @@
-# 需求—设计—实现追踪矩阵（遗留程序 → 微服务）
+# Requirements–Design–Implementation Traceability Matrix (Legacy Programs → Microservices)
 
-> 状态：`已实现` = 新服务提供等价能力并有测试；`部分` = 语义保留但界面/排版/批处理形态改变；
-> `延后` = 本期不实现且已说明理由；`替代` = 由平台能力替代。
-> 规则编号见 `docs/legacy/03-business-rule-catalog.md`；接口见 `docs/design/05-api-catalog.md`。
+> Status: `Implemented` = the new service provides equivalent capability with tests; `Partial` = semantics preserved but the UI/layout/batch form changed;
+> `Deferred` = not implemented in this phase with a stated reason; `Replaced` = superseded by platform capability.
+> Rule IDs are in `docs/legacy/03-business-rule-catalog.md`; interfaces are in `docs/design/05-api-catalog.md`.
 
-## 1. 在线程序（24）
+## 1. Online Programs (24)
 
-| 遗留程序 | 功能 | 目标服务 | 目标接口 / 类 | 规则 | 状态 |
+| Legacy program | Function | Target service | Target endpoint / class | Rules | Status |
 |---|---|---|---|---|---|
-| COSGN00C | 登录与菜单分流 | iam | `POST /api/v1/auth/login`、`/auth/verify` | BR-SGN-01..05、ADR-008 | 已实现 |
-| COADM01C | 管理员菜单 | iam | `GET/POST/PUT/DELETE /api/v1/users`（菜单项由前端渲染） | BR-USER-* | 已实现 |
-| COMEN01C | 普通用户菜单 | iam + 各服务 | 菜单项由前端根据 `landingMenu` 渲染 | — | 部分（菜单数据由前端维护） |
-| COUSR00C | 用户列表 | iam | `GET /api/v1/users` | BR-USER-05 | 已实现 |
-| COUSR01C | 用户新增 | iam | `POST /api/v1/users` | BR-USER-01..04 | 已实现 |
-| COUSR02C | 用户修改 | iam | `PUT /api/v1/users/{userId}` | BR-USER-06、BR-USER-04 | 已实现 |
-| COUSR03C | 用户删除 | iam | `DELETE /api/v1/users/{userId}` | BR-USER-07、NR-USER-01/02 | 已实现 |
-| COACTVWC | 账户视图（账户+客户） | account + customer + card | `GET /accounts/{id}` + `GET /customers/{cid}` + `GET /cards/by-account/{aid}` | BR-ACCT-07/08、BR-CARD-05 | 已实现（组合查询） |
-| COACTUPC | 账户+客户维护 | account + customer | `PUT /accounts/{id}`、`PUT /customers/{id}` | BR-ACCT-01..06、BR-CUST-02..12 | 已实现（拆两个用例） |
-| COCRDLIC | 卡片列表（7 行分页） | card | `GET /api/v1/cards?page&size=7` | BR-CARD-02..04 | 已实现（offset 分页） |
-| COCRDSLC | 卡片详情 | card | `GET /api/v1/cards/{cardNumber}` | BR-CARD-05/06 | 已实现 |
-| COCRDUPC | 卡片维护 | card | `PUT /api/v1/cards/{cardNumber}` | BR-CARD-07..11、NR-CARD-01/02 | 已实现 |
-| COTRN00C | 交易列表（10 行分页） | transaction | `GET /api/v1/transactions` | BR-TRN-09 | 已实现 |
-| COTRN01C | 交易详情 | transaction | `GET /api/v1/transactions/{id}` | BR-TRN-10 | 已实现 |
-| COTRN02C | 交易录入 | transaction | `POST /api/v1/transactions` | BR-TRN-01..08 | 已实现 |
-| COBIL00C | 账单支付 | transaction + account | `POST /api/v1/bill-payments` → `POST /accounts/{id}/payments` | BR-BILL-01..05、NR-ACCT-01 | 已实现 |
-| CORPT00C | 报表参数与提交 | transaction | `GET /api/v1/reports/transactions` | BR-RPT-01..03 | 部分（不生成 JCL） |
-| COPAUA0C | 授权决策 | authorization | `POST /api/v1/authorizations` | BR-AUTH-01..11 | 已实现 |
-| COPAUS0C | 待授权汇总视图 | authorization | `GET /api/v1/pending-authorizations/{accountId}` | BR-AUTH-12 | 已实现 |
-| COPAUS1C | 授权明细视图 | authorization | `GET /api/v1/authorizations/{id}` | BR-AUTH-12 | 已实现 |
-| COPAUS2C | 标记授权欺诈 | authorization | `POST /api/v1/authorizations/{id}/fraud` | BR-AUTH-12、BR-AUTH-06 | 已实现 |
-| COTRTLIC | 交易类型/类别列表 | transaction | `GET /api/v1/transaction-types`、`/transaction-categories` | BR-TT-01 | 部分（只读 + 类型描述维护） |
-| COTRTUPC | 交易类型/类别维护 | transaction | `PUT /api/v1/transaction-types/{code}` | BR-TT-01 | 部分（类别增删延后） |
-| COBTUPDT | 交易类型更新（DB2） | transaction | 同上 | BR-TT-01 | 部分 |
+| COSGN00C | Login and menu routing | iam | `POST /api/v1/auth/login`, `/auth/verify` | BR-SGN-01..05, ADR-008 | Implemented |
+| COADM01C | Administrator menu | iam | `GET/POST/PUT/DELETE /api/v1/users` (menu items rendered by the frontend) | BR-USER-* | Implemented |
+| COMEN01C | Regular user menu | iam + each service | Menu items are rendered by the frontend based on `landingMenu` | — | Partial (menu data maintained by the frontend) |
+| COUSR00C | User list | iam | `GET /api/v1/users` | BR-USER-05 | Implemented |
+| COUSR01C | Create user | iam | `POST /api/v1/users` | BR-USER-01..04 | Implemented |
+| COUSR02C | Update user | iam | `PUT /api/v1/users/{userId}` | BR-USER-06, BR-USER-04 | Implemented |
+| COUSR03C | Delete user | iam | `DELETE /api/v1/users/{userId}` | BR-USER-07, NR-USER-01/02 | Implemented |
+| COACTVWC | Account view (account + customer) | account + customer + card | `GET /accounts/{id}` + `GET /customers/{cid}` + `GET /cards/by-account/{aid}` | BR-ACCT-07/08, BR-CARD-05 | Implemented (composed query) |
+| COACTUPC | Account + customer maintenance | account + customer | `PUT /accounts/{id}`, `PUT /customers/{id}` | BR-ACCT-01..06, BR-CUST-02..12 | Implemented (split into two use cases) |
+| COCRDLIC | Card list (7 rows per page) | card | `GET /api/v1/cards?page&size=7` | BR-CARD-02..04 | Implemented (offset pagination) |
+| COCRDSLC | Card detail | card | `GET /api/v1/cards/{cardNumber}` | BR-CARD-05/06 | Implemented |
+| COCRDUPC | Card maintenance | card | `PUT /api/v1/cards/{cardNumber}` | BR-CARD-07..11, NR-CARD-01/02 | Implemented |
+| COTRN00C | Transaction list (10 rows per page) | transaction | `GET /api/v1/transactions` | BR-TRN-09 | Implemented |
+| COTRN01C | Transaction detail | transaction | `GET /api/v1/transactions/{id}` | BR-TRN-10 | Implemented |
+| COTRN02C | Transaction entry | transaction | `POST /api/v1/transactions` | BR-TRN-01..08 | Implemented |
+| COBIL00C | Bill payment | transaction + account | `POST /api/v1/bill-payments` → `POST /accounts/{id}/payments` | BR-BILL-01..05, NR-ACCT-01 | Implemented |
+| CORPT00C | Report parameters and submission | transaction | `GET /api/v1/reports/transactions` | BR-RPT-01..03 | Partial (does not generate JCL) |
+| COPAUA0C | Authorization decision | authorization | `POST /api/v1/authorizations` | BR-AUTH-01..11 | Implemented |
+| COPAUS0C | Pending authorization summary view | authorization | `GET /api/v1/pending-authorizations/{accountId}` | BR-AUTH-12 | Implemented |
+| COPAUS1C | Authorization detail view | authorization | `GET /api/v1/authorizations/{id}` | BR-AUTH-12 | Implemented |
+| COPAUS2C | Flag authorization as fraud | authorization | `POST /api/v1/authorizations/{id}/fraud` | BR-AUTH-12, BR-AUTH-06 | Implemented |
+| COTRTLIC | Transaction type/category list | transaction | `GET /api/v1/transaction-types`, `/transaction-categories` | BR-TT-01 | Partial (read-only + type description maintenance) |
+| COTRTUPC | Transaction type/category maintenance | transaction | `PUT /api/v1/transaction-types/{code}` | BR-TT-01 | Partial (category create/delete deferred) |
+| COBTUPDT | Transaction type update (DB2) | transaction | Same as above | BR-TT-01 | Partial |
 
-## 2. 批处理与工具程序（20）
+## 2. Batch and Utility Programs (20)
 
-| 遗留程序 | 功能 | 目标服务 / 替代 | 规则 | 状态 |
+| Legacy program | Function | Target service / replacement | Rules | Status |
 |---|---|---|---|---|
-| CBTRN02C | 日终入账 | transaction `POST /api/v1/postings` + account `postings` | BR-POST-01..08、NR-POST-01 | 已实现 |
-| CBTRN01C | 日交易校验（只读） | transaction `POST /api/v1/postings` 的校验阶段 | BR-POST-01..04 | 已实现（不再单独打印） |
-| CBTRN03C | 交易明细报表 | transaction `GET /api/v1/reports/transactions` | BR-RPT-01..05 | 部分（JSON 化，无 133 字节排版） |
-| CBACT04C | 利息计提 | transaction `POST /api/v1/interest-runs` + account `interest-accruals` | BR-INT-01..04 | 已实现 |
-| CBPAUP0C | 过期授权清理 | authorization `POST /api/v1/authorization-purges` | BR-AUTH-13、NR-AUTH-01/02 | 已实现 |
-| CBSTM03A | 对账单生成（文本+HTML） | — | — | 延后（报表平台，U5） |
-| CBSTM03B | 对账单排版子程序 | — | — | 延后 |
-| CBEXPORT | 分行迁移导出 | 迁移工具 | BR-MIG-01 | 延后 |
-| CBIMPORT | 分行迁移导入 | 迁移工具 + customer `POST` | BR-MIG-02 | 延后 |
-| DBUNLDGS | IMS 卸载到 GSAM | 迁移工具 | — | 延后 |
-| PAUDBUNL | IMS 授权库卸载 | 迁移工具（只迁近 5 天，U2） | — | 延后 |
-| PAUDBLOD | IMS 授权库装载 | 迁移工具 | — | 延后 |
-| CBACT01C | 账户打印 | account `GET /accounts` + 运维导出 | — | 部分（打印由运维工具实现） |
-| CBACT02C | 卡片打印 | card `GET /cards` + 运维导出 | — | 部分 |
-| CBACT03C | 交叉引用打印 | card `GET /cards` | — | 部分 |
-| CBCUS01C | 客户打印 | customer `GET /customers` | — | 部分 |
-| CSUTLDTC | 日期校验子程序 | `java.time` + DTO 校验 | BR-ACCT-04、BR-TRN-06 | 替代 |
-| COBSWAIT | 批处理等待 | 不需要（JCL 调度替代） | — | 替代 |
-| COACCT01 / CODATE01 | MQ 账户/日期查询 | account `GET /accounts/{id}`（MQ 适配器延后） | BR-MQ-01/02 | 部分 |
+| CBTRN02C | End-of-day posting | transaction `POST /api/v1/postings` + account `postings` | BR-POST-01..08, NR-POST-01 | Implemented |
+| CBTRN01C | Daily transaction validation (read-only) | the validation stage of transaction `POST /api/v1/postings` | BR-POST-01..04 | Implemented (no longer printed separately) |
+| CBTRN03C | Transaction detail report | transaction `GET /api/v1/reports/transactions` | BR-RPT-01..05 | Partial (JSON, no 133-byte layout) |
+| CBACT04C | Interest accrual | transaction `POST /api/v1/interest-runs` + account `interest-accruals` | BR-INT-01..04 | Implemented |
+| CBPAUP0C | Expired authorization purge | authorization `POST /api/v1/authorization-purges` | BR-AUTH-13, NR-AUTH-01/02 | Implemented |
+| CBSTM03A | Statement generation (text + HTML) | — | — | Deferred (reporting platform, U5) |
+| CBSTM03B | Statement layout subroutine | — | — | Deferred |
+| CBEXPORT | Branch migration export | migration tool | BR-MIG-01 | Deferred |
+| CBIMPORT | Branch migration import | migration tool + customer `POST` | BR-MIG-02 | Deferred |
+| DBUNLDGS | IMS unload to GSAM | migration tool | — | Deferred |
+| PAUDBUNL | IMS authorization database unload | migration tool (migrates only the last 5 days, U2) | — | Deferred |
+| PAUDBLOD | IMS authorization database load | migration tool | — | Deferred |
+| CBACT01C | Account printing | account `GET /accounts` + ops export | — | Partial (printing implemented by ops tooling) |
+| CBACT02C | Card printing | card `GET /cards` + ops export | — | Partial |
+| CBACT03C | Cross-reference printing | card `GET /cards` | — | Partial |
+| CBCUS01C | Customer printing | customer `GET /customers` | — | Partial |
+| CSUTLDTC | Date validation subroutine | `java.time` + DTO validation | BR-ACCT-04, BR-TRN-06 | Replaced |
+| COBSWAIT | Batch wait | Not needed (replaced by JCL scheduling) | — | Replaced |
+| COACCT01 / CODATE01 | MQ account/date lookup | account `GET /accounts/{id}` (MQ adapter deferred) | BR-MQ-01/02 | Partial |
 
-> 说明：`COBSWAIT` 与 `CSUTLDTC` 的能力由平台/语言替代，不单独建服务；打印类程序的**数据口径**
-> 已由查询 API 覆盖，纸质排版不迁移（U5）。
+> Note: the capabilities of `COBSWAIT` and `CSUTLDTC` are replaced by the platform/language and do not get their own services; the **data semantics**
+> of the printing programs are already covered by the query APIs, and paper layout is not migrated (U5).
 
-## 3. 规则 → 实现 → 测试
+## 3. Rules → Implementation → Tests
 
-| 规则组 | 实现类 | 测试 |
+| Rule group | Implementation classes | Tests |
 |---|---|---|
-| BR-SGN-01..05、NR-USER-01/02 | `iam.application.AuthenticationService`、`UserDirectoryService` | `AuthenticationServiceTest`、`UserControllerTest` |
-| BR-USER-01..07 | `UserDirectoryService` | `UserDirectoryServiceTest`、`UserControllerTest` |
-| BR-CUST-02..12、NR-CUST-01 | `CustomerService`、`domain.model.Customer` | `CustomerTest`、`CustomerControllerTest` |
-| BR-CARD-01..11、NR-CARD-01/02 | `CardService`、`domain.model.Card` | `CardTest`、`CardControllerTest` |
-| BR-ACCT-02..06、BR-ACCT-09..11、NR-ACCT-01 | `AccountApplicationService`、`Account` | `AccountTest`、`AccountControllerTest` |
-| BR-TRN-01..08、BR-POST-01..08、NR-POST-01 | `TransactionApplicationService`、`PostingService`、`PostingPolicy` | `PostingPolicyTest`、`TransactionControllerTest` |
-| BR-INT-01..04 | `InterestService`、`InterestCalculator` | `InterestCalculatorTest`、`InterestServiceTest` |
+| BR-SGN-01..05, NR-USER-01/02 | `iam.application.AuthenticationService`, `UserDirectoryService` | `AuthenticationServiceTest`, `UserControllerTest` |
+| BR-USER-01..07 | `UserDirectoryService` | `UserDirectoryServiceTest`, `UserControllerTest` |
+| BR-CUST-02..12, NR-CUST-01 | `CustomerService`, `domain.model.Customer` | `CustomerTest`, `CustomerControllerTest` |
+| BR-CARD-01..11, NR-CARD-01/02 | `CardService`, `domain.model.Card` | `CardTest`, `CardControllerTest` |
+| BR-ACCT-02..06, BR-ACCT-09..11, NR-ACCT-01 | `AccountApplicationService`, `Account` | `AccountTest`, `AccountControllerTest` |
+| BR-TRN-01..08, BR-POST-01..08, NR-POST-01 | `TransactionApplicationService`, `PostingService`, `PostingPolicy` | `PostingPolicyTest`, `TransactionControllerTest` |
+| BR-INT-01..04 | `InterestService`, `InterestCalculator` | `InterestCalculatorTest`, `InterestServiceTest` |
 | BR-BILL-01..05 | `BillPaymentService` | `BillPaymentServiceTest` |
 | BR-RPT-01..04 | `TransactionReportService` | `TransactionReportServiceTest` |
-| BR-AUTH-01..13、NR-AUTH-01/02/03 | `AuthorizationService`、`AuthorizationPolicy`、`AuthorizationPurgeService` | `AuthorizationPolicyTest`、`AuthorizationControllerTest` |
+| BR-AUTH-01..13, NR-AUTH-01/02/03 | `AuthorizationService`, `AuthorizationPolicy`, `AuthorizationPurgeService` | `AuthorizationPolicyTest`, `AuthorizationControllerTest` |
 
-## 6. 覆盖度自检
+## 6. Coverage Self-Check
 
-| 检查项 | 结果 |
+| Check | Result |
 |---|---|
-| 44 个遗留程序是否都有去向 | 44/44（24 在线 + 20 批处理/工具，见 §1/§2） |
-| 核心域程序（授权/入账/利息/账单支付/账户维护）是否等价实现 | 5/5 |
-| 每条已声明的业务规则是否有实现或明确延后理由 | 100% |
-| 每项延后是否需要业务确认 | 是（U4 商户欺诈、U5 报表排版、BR-MIG、BR-MQ、BR-INT-05 费用） |
-| 是否存在未追踪的遗留数据字段 | 否（见 `docs/legacy/04-data-dictionary.md`，卡片 CVV 仅存储不暴露） |
+| Does every one of the 44 legacy programs have a destination? | 44/44 (24 online + 20 batch/utility, see §1/§2) |
+| Are the core-domain programs (authorization/posting/interest/bill payment/account maintenance) implemented equivalently? | 5/5 |
+| Does every declared business rule have an implementation or an explicit deferral reason? | 100% |
+| Does each deferral need business confirmation? | Yes (U4 merchant fraud, U5 report layout, BR-MIG, BR-MQ, BR-INT-05 fees) |
+| Are there untracked legacy data fields? | No (see `docs/legacy/04-data-dictionary.md`; the card CVV is stored but never exposed) |

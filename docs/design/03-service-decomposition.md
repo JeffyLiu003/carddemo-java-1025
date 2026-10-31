@@ -1,147 +1,148 @@
-# 微服务拆分与部署设计
+# Microservice Decomposition and Deployment Design
 
-## 1. 服务清单
+## 1. Service Inventory
 
-| 服务 | 端口 | 数据库 | 核心用例 | 关键依赖 |
+| Service | Port | Database | Core use cases | Key dependencies |
 |---|---|---|---|---|
-| web-ui | 8090 → 容器 8080 | —（静态 SPA + 同源代理） | 登录、账户视图、卡片、交易、账单、报表、授权、过账、总账、对账/EOD、用户管理 | 全部微服务 |
-| iam-service | 8081 | `carddemo_iam` | 登录、token 签发、用户 CRUD | 无 |
-| customer-service | 8082 | `carddemo_customer` | 客户查询/新增/修改 | 无 |
-| card-service | 8083 | `carddemo_card` | 卡列表/详情/维护、按账户查卡 | 无 |
-| account-service | 8084 | `carddemo_account` | 账户查询/维护、产品目录、额度与可用额度、资金冻结、记账、还款、利息入账 | 无 |
-| transaction-service | 8085 | `carddemo_transaction` | 交易录入/查询、入账、利息、账单支付、报表、交易类型、过账引擎 | card、account、ledger |
-| ledger-service | 8088 | `carddemo_ledger` | 科目表、日记账、冲正、试算平衡、期间关账 | 无 |
-| reconciliation-service | 8089 | `carddemo_reconciliation` | 批次↔日记账对账、差异处理、EOD 作业 | transaction、ledger |
-| payment-service | 8091 | `carddemo_payment` | 支付受理/筛查/接受/清算/退汇 | account、transaction |
-| billing-service | 8092 | `carddemo_billing` | 账单生成、利息/最低还款、账单支付 | account |
-| limit-service | 8093 | `carddemo_limit` | 限额定义、占用/释放、可用性检查 | 无 |
-| fx-service | 8094 | `carddemo_fx` | 汇率、报价、换汇 | 无 |
-| loan-service | 8095 | `carddemo_loan` | 贷款申请/审批/放款/还款计划 | 无 |
-| fraud-service | 8096 | `carddemo_fraud` | 欺诈评分/警报 | 无 |
-| aml-service | 8097 | `carddemo_aml` | 名单筛查/AML 警报 | 无 |
-| dispute-service | 8098 | `carddemo_dispute` | 争议/chargeback | 无 |
-| collections-service | 8099 | `carddemo_collections` | 逾期分桶/催收 | 无 |
-| batch-service | 8100 | `carddemo_batch` | 作业定义/EOD 执行 | transaction、reconciliation |
-| reporting-service | 8101 | `carddemo_reporting` | 交易汇总/试算平衡报表 | transaction、ledger |
-| notification-service | 8102 | `carddemo_notification` | 模板/通知/发送 | 无 |
-| document-service | 8103 | `carddemo_document` | 文档元数据/内容 | 无 |
-| workflow-service | 8104 | `carddemo_workflow` | 流程定义/任务审批 | 无 |
-| audit-service | 8105 | `carddemo_audit` | 追加式审计事件 | 无 |
-| reference-data-service | 8106 | `carddemo_reference` | 参考数据 | 无 |
-| bff-service | 8107 | — | 客户 360 聚合 | account、card、customer、transaction |
-| search-service | 8108 | — | 客户/交易搜索 | customer、transaction |
-| authorization-service | 8086 | `carddemo_authorization` | 授权决策、待授权汇总、欺诈标记、过期清理 | card、account、customer |
+| web-ui | 8090 → container 8080 | — (static SPA + same-origin proxy) | Login, account view, cards, transactions, statements, reports, authorization, posting, general ledger, reconciliation/EOD, user management | All microservices |
+| iam-service | 8081 | `carddemo_iam` | Login, token issuance, user CRUD | None |
+| customer-service | 8082 | `carddemo_customer` | Customer query/create/update | None |
+| card-service | 8083 | `carddemo_card` | Card list/detail/maintenance, lookup by account | None |
+| account-service | 8084 | `carddemo_account` | Account query/maintenance, product catalog, limit and available credit, fund holds, posting, repayment, interest accrual | None |
+| transaction-service | 8085 | `carddemo_transaction` | Transaction entry/query, posting, interest, bill payment, reports, transaction types, posting engine | card, account, ledger |
+| ledger-service | 8088 | `carddemo_ledger` | Chart of accounts, journal entries, reversal, trial balance, period closing | None |
+| reconciliation-service | 8089 | `carddemo_reconciliation` | Batch ↔ journal entry reconciliation, discrepancy handling, EOD jobs | transaction, ledger |
+| payment-service | 8091 | `carddemo_payment` | Payment intake/screening/acceptance/settlement/return | account, transaction |
+| billing-service | 8092 | `carddemo_billing` | Statement generation, interest/minimum payment, statement payment | account |
+| limit-service | 8093 | `carddemo_limit` | Limit definitions, holds/releases, availability checks | None |
+| fx-service | 8094 | `carddemo_fx` | FX rates, quotes, conversion | None |
+| loan-service | 8095 | `carddemo_loan` | Loan application/approval/disbursement/repayment schedule | None |
+| fraud-service | 8096 | `carddemo_fraud` | Fraud scoring/alerts | None |
+| aml-service | 8097 | `carddemo_aml` | Sanctions screening/AML alerts | None |
+| dispute-service | 8098 | `carddemo_dispute` | Disputes/chargebacks | None |
+| collections-service | 8099 | `carddemo_collections` | Delinquency bucketing/collections | None |
+| batch-service | 8100 | `carddemo_batch` | Job definitions/EOD execution | transaction, reconciliation |
+| reporting-service | 8101 | `carddemo_reporting` | Transaction summaries/trial balance reports | transaction, ledger |
+| notification-service | 8102 | `carddemo_notification` | Templates/notifications/sending | None |
+| document-service | 8103 | `carddemo_document` | Document metadata/content | None |
+| workflow-service | 8104 | `carddemo_workflow` | Workflow definitions/task approval | None |
+| audit-service | 8105 | `carddemo_audit` | Append-only audit events | None |
+| reference-data-service | 8106 | `carddemo_reference` | Reference data | None |
+| bff-service | 8107 | — | Customer 360 aggregation | account, card, customer, transaction |
+| search-service | 8108 | — | Customer/transaction search | customer, transaction |
+| authorization-service | 8086 | `carddemo_authorization` | Authorization decisions, pending authorization summaries, fraud flags, expired purge | card, account, customer |
 
-## 2. 数据所有权
+## 2. Data Ownership
 
-| 表 | 属主 | 说明 |
+| Table | Owner | Notes |
 |---|---|---|
-| `sec_user` | iam | 用户安全主数据 |
-| `customer` | customer | 客户主数据（SSN 掩码输出） |
-| `card`、`card_xref`、`card_fraud_flag`（授权侧独立表） | card / authorization | 卡主数据归 card；欺诈标记归 authorization |
-| `account` | account | 余额与额度唯一权威 |
-| `transaction`、`daily_transaction`、`tran_category_balance`、`tran_type`、`tran_category`、`disclosure_group` | transaction | 交易账本与参照数据 |
-| `posting_type`、`posting_rule`、`posting_batch`、`posting_leg` | transaction | 过账类型、规则、批次与借贷分录 |
-| `ledger_account`、`accounting_period`、`journal_entry`、`journal_line` | ledger | 科目表、期间、日记账与分录行 |
-| `reconciliation_run`、`reconciliation_item`、`eod_run` | reconciliation | 对账运行、差异明细与 EOD 作业记录 |
-| `payment_order` | payment | 支付指令与状态机 |
-| `statement` | billing | 账单（账户+期间唯一） |
-| `limit_definition` | limit | 限额与用量 |
-| `fx_rate`、`fx_quote`、`fx_conversion` | fx | 汇率、报价与换汇记录 |
-| `loan_application`、`loan`、`repayment_schedule` | loan | 贷款申请、贷款与还款计划 |
-| `fraud_rule`、`fraud_evaluation`、`fraud_alert` | fraud | 规则、评分与警报 |
-| `sanctions_entry`、`screening_result`、`aml_alert` | aml | 名单、筛查与警报 |
-| `dispute_case` | dispute | 争议案件 |
-| `delinquency_case` | collections | 逾期案件 |
-| `job_definition`、`job_run` | batch | 作业定义与运行 |
-| `report_definition`、`report_run`、`report_row` | reporting | 报表定义/运行/结果 |
-| `notification_template`、`notification` | notification | 模板与通知 |
-| `document_metadata` | document | 文档元数据与文本 |
-| `workflow_definition`、`workflow_task` | workflow | 流程定义与任务 |
-| `audit_event` | audit | 追加式审计事件 |
-| `reference_item` | reference | 参考数据 |
-| `auth_summary`、`auth_detail` | authorization | 待授权汇总与明细 |
+| `sec_user` | iam | User security master data |
+| `customer` | customer | Customer master data (masked SSN output) |
+| `card`, `card_xref`, `card_fraud_flag` (a separate table on the authorization side) | card / authorization | Card master data belongs to card; fraud flags belong to authorization |
+| `account` | account | Single authority for balance and limit |
+| `transaction`, `daily_transaction`, `tran_category_balance`, `tran_type`, `tran_category`, `disclosure_group` | transaction | Transaction ledger and reference data |
+| `posting_type`, `posting_rule`, `posting_batch`, `posting_leg` | transaction | Posting types, rules, batches and debit/credit legs |
+| `ledger_account`, `accounting_period`, `journal_entry`, `journal_line` | ledger | Chart of accounts, periods, journal entries and lines |
+| `reconciliation_run`, `reconciliation_item`, `eod_run` | reconciliation | Reconciliation runs, discrepancy details and EOD job records |
+| `payment_order` | payment | Payment instructions and state machine |
+| `statement` | billing | Statements (unique account + period) |
+| `limit_definition` | limit | Limits and usage |
+| `fx_rate`, `fx_quote`, `fx_conversion` | fx | FX rates, quotes and conversion records |
+| `account_credit` | account | Generic credit ledger (cashback/benefit postings, idempotent by creditId) |
+| `loan_application`, `loan`, `repayment_schedule` | loan | Loan applications, loans and repayment schedules |
+| `fraud_rule`, `fraud_evaluation`, `fraud_alert` | fraud | Rules, evaluations and alerts |
+| `sanctions_entry`, `screening_result`, `aml_alert` | aml | Sanctions lists, screening results and alerts |
+| `dispute_case` | dispute | Dispute cases |
+| `delinquency_case` | collections | Delinquency cases |
+| `job_definition`, `job_run` | batch | Job definitions and runs |
+| `report_definition`, `report_run`, `report_row` | reporting | Report definitions/runs/results |
+| `notification_template`, `notification` | notification | Templates and notifications |
+| `document_metadata` | document | Document metadata and text |
+| `workflow_definition`, `workflow_task` | workflow | Workflow definitions and tasks |
+| `audit_event` | audit | Append-only audit events |
+| `reference_item` | reference | Reference data |
+| `auth_summary`, `auth_detail` | authorization | Pending authorization summaries and details |
 
-## 3. 服务间调用矩阵
+## 3. Service Call Matrix
 
-| 调用方 → 被调方 | Card | Account | Customer | Transaction | Ledger | Reconciliation |
+| Caller → Callee | Card | Account | Customer | Transaction | Ledger | Reconciliation |
 |---|---|---|---|---|---|---|
-| transaction-service | GET 卡快照 | GET 快照 / POST 记账 / POST 还款 / POST 利息 | — | — | POST 日记账 | — |
-| authorization-service | GET 卡快照 | GET 快照 | GET 客户存在性 | — | — | — |
-| reconciliation-service | — | — | — | GET 过账批次 | GET 日记账/试算平衡 | — |
-| payment-service | — | GET 账户 | — | POST 过账/冲正 | — | — |
-| billing-service | — | GET 账户/产品、POST 还款 | — | — | — | — |
+| transaction-service | GET card snapshot | GET snapshot / POST posting / POST repayment / POST interest | — | — | POST journal entry | — |
+| authorization-service | GET card snapshot | GET snapshot | GET customer existence | — | — | — |
+| reconciliation-service | — | — | — | GET posting batches | GET journal entries/trial balance | — |
+| payment-service | — | GET account | — | POST posting/reversal | — | — |
+| billing-service | — | GET account/product, POST repayment | — | — | — | — |
 | ledger-service | — | — | — | — | — | — |
 | account-service | — | — | — | — | — | — |
 | card-service | — | — | — | — | — | — |
 | customer-service | — | — | — | — | — | — |
 | iam-service | — | — | — | — | — | — |
 
-调用次数（单次业务操作）：
+Call counts (per business operation):
 
-| 业务操作 | 调用链 | 最坏增时（本地 Compose） |
+| Business operation | Call chain | Worst-case added latency (local Compose) |
 |---|---|---|
-| 交易录入 | transaction → card(1) | +10ms |
-| 日终入账（单笔） | transaction → card(1) + account GET(1) + account POST(1) | +30ms |
-| 账单支付 | transaction → account GET(1) + account POST(1) + card(1) | +30ms |
-| 利息运行 | transaction → account POST(每账户 1 次) | 账户数 × 10ms |
-| 授权决策 | authorization → card(1) + account(1) + customer(1) | +30ms |
-| 创建过账批次 | transaction → account GET(1) + account POST(1) + ledger POST(1) | +40ms（总账失败仅告警） |
-| 执行对账 | reconciliation → transaction GET(≤40 页) + ledger GET(≤40 页) + trial GET(1) | 数据量相关；本地 Compose 约 +50ms |
-| 执行 EOD | reconciliation → 对账(1) | 同对账 |
-| 支付清算 | payment → account GET(1) + transaction POST(1) | +30ms |
-| 支付退汇 | payment → transaction POST reversal(1) | +20ms |
-| 账单生成 | billing → account GET(2) | +20ms |
-| 账单支付 | billing → account POST payments(1) | +10ms |
+| Transaction entry | transaction → card(1) | +10ms |
+| End-of-day posting (single) | transaction → card(1) + account GET(1) + account POST(1) | +30ms |
+| Bill payment | transaction → account GET(1) + account POST(1) + card(1) | +30ms |
+| Interest run | transaction → account POST (once per account) | accounts × 10ms |
+| Authorization decision | authorization → card(1) + account(1) + customer(1) | +30ms |
+| Create posting batch | transaction → account GET(1) + account POST(1) + ledger POST(1) | +40ms (a general ledger failure only raises a warning) |
+| Run reconciliation | reconciliation → transaction GET (≤40 pages) + ledger GET (≤40 pages) + trial GET(1) | Data-volume dependent; about +50ms on local Compose |
+| Run EOD | reconciliation → reconciliation(1) | Same as reconciliation |
+| Payment settlement | payment → account GET(1) + transaction POST(1) | +30ms |
+| Payment return | payment → transaction POST reversal(1) | +20ms |
+| Statement generation | billing → account GET(2) | +20ms |
+| Statement payment | billing → account POST payments(1) | +10ms |
 
-## 4. 调用与失败语义
+## 4. Call and Failure Semantics
 
-| 下游结果 | 上游处理 |
+| Downstream result | Upstream handling |
 |---|---|
-| `200` | 正常继续 |
-| `404` | 视为"实体不存在"：入账 → 拒付 101；授权 → 拒绝 3100；交易录入 → 400 |
-| `409`（业务规则） | 透传为上游 409，携带下游 `code` 与 `message` |
-| `5xx` / 超时（3s） | 抛 `RemoteServiceException` → HTTP 503 `DEPENDENCY_UNAVAILABLE`，不落账、不拒绝（授权返回 503 由调用方重试） |
+| `200` | Continue normally |
+| `404` | Treated as "entity does not exist": posting → decline 101; authorization → decline 3100; transaction entry → 400 |
+| `409` (business rule) | Passed through as an upstream 409, carrying the downstream `code` and `message` |
+| `5xx` / timeout (3s) | Throws `RemoteServiceException` → HTTP 503 `DEPENDENCY_UNAVAILABLE`; nothing is posted and nothing is declined (authorization returns 503 and the caller retries) |
 
-**失败关闭原则**：授权场景下"无法判断额度"绝不能默认批准。
+**Fail-closed principle**: in authorization scenarios, "unable to determine the limit" must never default to approval.
 
-## 5. 一致性与幂等
+## 5. Consistency and Idempotency
 
-- 账单支付：`transaction` 先落库（PENDING）→ 调 `account /payments` → 置 POSTED；失败回滚本地事务（ADR-005）。
-- 入账：单笔失败记 `REJECTED` + 原因码，整批继续；返回 `COMPLETED_WITH_REJECTS`。
-- 幂等键：`transactionId`（入账/录入）；`cardNumber + authTimestamp` 对应 `authorizationId`（授权）；
-  `idempotencyKey`（过账批次）；`(sourceType, sourceId)`（总账日记账）。
-- 过账：账户调用成功 → 保存批次与分录 → 尽力同步总账；总账失败只告警，批次 `ledgerEntryId` 为空。
-- 冲正：生成反向批次/反向日记账，原记录标记 REVERSED，不删除历史。
-- 对账：按业务日期比对过账批次与 `POSTING_BATCH` 日记账；试算平衡校验 `Σ借=Σ贷`；
-  差异落 `reconciliation_item`，只读账务、不修改余额或分录。账户余额 vs 总账待子账映射。
-- 支付：`payment_order.idempotency_key` 唯一；清算过账幂等键 `payment:<paymentId>`；退汇走原批次冲正。
-- 账单：`statement (account_id, period)` 唯一；账单支付复用 account `/payments`，重复支付幂等。
-- 限额：`(scope_type, scope_id, limit_type, currency)` 唯一；占用/释放走行锁。
-- FX：报价 5 分钟有效、单次消费；`fx_conversion.quote_id` 唯一兜底。
+- Bill payment: `transaction` persists first (PENDING) → calls `account /payments` → sets POSTED; a failure rolls back the local transaction (ADR-005).
+- Posting: a single failure is recorded as `REJECTED` + reason code and the whole batch continues; returns `COMPLETED_WITH_REJECTS`.
+- Idempotency keys: `transactionId` (posting/entry); `cardNumber + authTimestamp` maps to `authorizationId` (authorization);
+  `idempotencyKey` (posting batch); `(sourceType, sourceId)` (general ledger journal entry).
+- Posting batch: account call succeeds → save the batch and legs → best-effort sync to the general ledger; a general ledger failure only raises a warning and the batch's `ledgerEntryId` stays empty.
+- Reversal: generates an opposite batch/opposite journal entry and marks the original record REVERSED; history is never deleted.
+- Reconciliation: compares posting batches with `POSTING_BATCH` journal entries by business date; the trial balance verifies `Σdebit=Σcredit`;
+  discrepancies land in `reconciliation_item`; accounting is read-only and neither balances nor entries are modified. Account balance vs general ledger awaits sub-ledger mapping.
+- Payment: `payment_order.idempotency_key` is unique; the settlement posting idempotency key is `payment:<paymentId>`; returns reverse the original batch.
+- Statements: `statement (account_id, period)` is unique; statement payment reuses account `/payments`, and repeated payments are idempotent.
+- Limits: `(scope_type, scope_id, limit_type, currency)` is unique; holds/releases use row locks.
+- FX: quotes are valid for 5 minutes and consumed once; `fx_conversion.quote_id` is unique as a backstop.
 
-## 6. 部署单元
+## 6. Deployment Units
 
 ```
 docker compose
-├── postgres (16)                # 单实例，24 个 database（init 脚本创建，max_connections=300）
+├── postgres (16)                # single instance, 24 databases (created by the init script, max_connections=300)
 ├── iam-service        :8081
 ├── customer-service   :8082
 ├── card-service       :8083
 ├── account-service    :8084
-├── transaction-service:8085  → 依赖 card/account/ledger started
-├── ledger-service     :8088  → 依赖 postgres healthy
-├── reconciliation-service:8089 → 依赖 postgres/transaction/ledger started
-├── payment-service    :8091  → 依赖 postgres/account/transaction started
-├── billing-service    :8092  → 依赖 postgres/account started
-├── limit-service      :8093  → 依赖 postgres healthy
-├── fx-service         :8094  → 依赖 postgres healthy
-├── bff-service        :8107  → 依赖 account/card/customer/transaction
-├── search-service     :8108  → 依赖 customer/transaction
-├── authorization-service:8086 → 依赖 card/account/customer healthy
-└── web-ui             :8090 → 宿主机 8090 映射容器 8080（宿主 8080 被占用）
+├── transaction-service:8085  → depends on card/account/ledger started
+├── ledger-service     :8088  → depends on postgres healthy
+├── reconciliation-service:8089 → depends on postgres/transaction/ledger started
+├── payment-service    :8091  → depends on postgres/account/transaction started
+├── billing-service    :8092  → depends on postgres/account started
+├── limit-service      :8093  → depends on postgres healthy
+├── fx-service         :8094  → depends on postgres healthy
+├── bff-service        :8107  → depends on account/card/customer/transaction
+├── search-service     :8108  → depends on customer/transaction
+├── authorization-service:8086 → depends on card/account/customer healthy
+└── web-ui             :8090 → host 8090 maps to container 8080 (host 8080 is taken)
 
-# docker compose --profile extended up -d 追加：
+# Appended by docker compose --profile extended up -d:
 ├── loan-service       :8095
 ├── fraud-service      :8096
 ├── aml-service        :8097
@@ -156,33 +157,33 @@ docker compose
 └── reference-data-service:8106
 ```
 
-> `web-ui` 是**表现层**，不是限界上下文：它只托管静态 SPA，并把 `/api/**` 按路径前缀同源代理到
-> 26 个微服务，不拥有任何业务数据、不实现业务规则。浏览器因此只需访问一个源，无需 CORS。
+> `web-ui` is the **presentation layer**, not a bounded context: it only hosts the static SPA and same-origin proxies `/api/**` to
+> 26 microservices by path prefix; it owns no business data and implements no business rules. The browser therefore needs only one origin and no CORS.
 
-启动顺序：`postgres`（healthcheck: `pg_isready`）→ 无依赖服务 → `ledger` → `transaction` →
-`reconciliation` / `authorization` / `web-ui`。
-每个服务暴露 Spring Boot Actuator `/actuator/health` 用于探活；下游客户端为懒加载，
-服务启动不依赖下游可用，调用失败时返回 `503`。`docker-compose.yml` 中
-`transaction`/`authorization` 对下游使用 `condition: service_started`（只保证容器已启动，
-避免启动顺序导致的死锁）。
+Startup order: `postgres` (healthcheck: `pg_isready`) → services without dependencies → `ledger` → `transaction` →
+`reconciliation` / `authorization` / `web-ui`.
+Every service exposes Spring Boot Actuator `/actuator/health` for liveness checks; downstream clients are lazily loaded, so
+service startup does not depend on downstream availability and a failed call returns `503`. In `docker-compose.yml`,
+`transaction`/`authorization` use `condition: service_started` for their downstreams (which only guarantees the container has started,
+avoiding deadlocks caused by startup order).
 
-## 7. 容量与伸缩
+## 7. Capacity and Scaling
 
-| 服务 | 伸缩特征 | 备注 |
+| Service | Scaling characteristics | Notes |
 |---|---|---|
-| authorization | 无状态、读多写少，可水平扩容；汇总行按账户存在热点 | 同一账户并发授权需串行（乐观锁重试） |
-| transaction | 写多、批处理需单实例运行（避免重复入账） | 入账接口按 `transactionId` 幂等，可多实例 |
-| account | 按账户热点；行级更新 | 单账户 QPS 受行锁/版本冲突限制 |
-| card / customer | 读多写少 | 可加缓存（本期未做） |
-| iam | 低流量 | — |
+| authorization | Stateless, read-heavy and write-light, can scale horizontally; summary rows have per-account hot spots | Concurrent authorizations for the same account must serialize (optimistic locking retry) |
+| transaction | Write-heavy; batch processing must run on a single instance (to avoid duplicate posting) | The posting endpoint is idempotent by `transactionId`, so multiple instances are fine |
+| account | Per-account hot spots; row-level updates | Per-account QPS is limited by row locks/version conflicts |
+| card / customer | Read-heavy and write-light | Caching can be added (not done in this phase) |
+| iam | Low traffic | — |
 
-## 8. 配置项
+## 8. Configuration
 
-| 变量 | 服务 | 默认 |
+| Variable | Service | Default |
 |---|---|---|
-| `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER`/`DB_PASSWORD` | 全部 | `localhost`/`5432`/`carddemo_*`/`carddemo`/`carddemo` |
-| `CARD_SERVICE_URL` | transaction、authorization | `http://localhost:8083`（Compose 内 `http://card-service:8083`） |
-| `ACCOUNT_SERVICE_URL` | transaction、authorization | `http://localhost:8084` |
+| `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER`/`DB_PASSWORD` | All | `localhost`/`5432`/`carddemo_*`/`carddemo`/`carddemo` |
+| `CARD_SERVICE_URL` | transaction, authorization | `http://localhost:8083` (`http://card-service:8083` inside Compose) |
+| `ACCOUNT_SERVICE_URL` | transaction, authorization | `http://localhost:8084` |
 | `CUSTOMER_SERVICE_URL` | authorization | `http://localhost:8082` |
-| `IAM_TOKEN_SECRET` | iam | 演示密钥（生产必须从密钥管理注入） |
+| `IAM_TOKEN_SECRET` | iam | Demo secret (in production it must be injected from a secret manager) |
 | `IAM_TOKEN_TTL_SECONDS` | iam | `3600` |

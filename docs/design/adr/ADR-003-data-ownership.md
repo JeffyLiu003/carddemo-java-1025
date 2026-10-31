@@ -1,52 +1,52 @@
-# ADR-003: 数据所有权与"每服务一库"
+# ADR-003: Data Ownership and "One Database per Service"
 
-| 项 | 内容 |
+| Item | Content |
 |----|------|
-| 编号 | ADR-003 |
-| 日期 | 2026-10-25 |
-| 状态 | 已接受 |
-| 关联需求 | ADR-001；`docs/design/06-traceability-matrix.md` |
+| ID | ADR-003 |
+| Date | 2026-10-25 |
+| Status | Accepted |
+| Related requirements | ADR-001; `docs/design/06-traceability-matrix.md` |
 
-## 背景
+## Context
 
-遗留系统中多个程序直接跨文件读写：`COACTUPC` 同时更新 ACCTDAT 与 CUSTDAT；`CBTRN02C` 直接
-更新 ACCTDAT 与 TCATBALF；`COPAUA0C` 直接读 ACCTDAT/CUSTDAT/CCXREF。微服务化后，若仍允许
-跨库直连，将重新形成"分布式单体"。必须明确每张表的唯一属主。
+In the legacy system, several programs read and write across files directly: `COACTUPC` updates ACCTDAT and CUSTDAT at the same time; `CBTRN02C` directly
+updates ACCTDAT and TCATBALF; `COPAUA0C` directly reads ACCTDAT/CUSTDAT/CCXREF. After moving to microservices, if cross-database direct access were still allowed,
+a "distributed monolith" would form again. The single owner of every table must be made explicit.
 
-## 候选方案
+## Alternatives
 
-| 方案 | 描述 | 优点 | 缺点 |
+| Option | Description | Pros | Cons |
 |---|---|---|---|
-| 方案A：每服务独立数据库 | 6 个 PostgreSQL database，禁止跨库访问 | 边界强制；可独立迁移/扩容/回滚 | 跨域查询需 API 组合；一致性问题前移 |
-| 方案B：共享库、按 schema 隔离 | 单库多 schema | 迁移简单；可跨 schema 查询 | 边界软化，易被绕过；锁竞争与版本耦合 |
-| 方案C：共享库共享表 | 沿用遗留单库 | 最省事 | 无法独立部署；违背微服务目标 |
+| Option A: separate database per service | 6 PostgreSQL databases, cross-database access forbidden | Boundaries enforced; can be migrated/scaled/rolled back independently | Cross-domain queries need API composition; consistency issues move upstream |
+| Option B: shared database, isolated by schema | One database with multiple schemas | Simple migration; cross-schema queries possible | Boundaries softened and easily bypassed; lock contention and version coupling |
+| Option C: shared database, shared tables | Keep the legacy single database | Least effort | Cannot be deployed independently; violates the microservices goal |
 
-## 量化权衡表
+## Quantitative Trade-off Table
 
-| 方案 | 实现成本 | 性能开销 | 运维时效 | 审计性 | 风险 |
+| Option | Implementation cost | Performance overhead | Operational agility | Auditability | Risk |
 |---|---|---|---|---|---|
-| A | 中（6 库 + 初始化脚本） | 中（跨域查询走 HTTP） | 单服务可独立回滚 | 高（数据责任清晰） | 中（一致性） |
-| B | 低 | 低 | 需共享库变更窗口 | 中 | 中高（边界腐化） |
-| C | 最低 | 最低 | 整体发布 | 低 | 高 |
+| A | Medium (6 databases + initialization scripts) | Medium (cross-domain queries go over HTTP) | A single service can be rolled back independently | High (clear data responsibility) | Medium (consistency) |
+| B | Low | Low | Requires a shared-database change window | Medium | Medium-high (boundary erosion) |
+| C | Lowest | Lowest | Whole-application release | Low | High |
 
-## 决策
+## Decision
 
-采用方案 A：`carddemo_iam`、`carddemo_customer`、`carddemo_card`、`carddemo_account`、
-`carddemo_transaction`、`carddemo_authorization` 六个独立数据库，服务间只通过 REST 交互。
+Adopt Option A: six independent databases — `carddemo_iam`, `carddemo_customer`, `carddemo_card`, `carddemo_account`,
+`carddemo_transaction`, `carddemo_authorization` — and services interact only through REST.
 
-## 理由
+## Rationale
 
-1. 聚合根与表的对应关系稳定（见数据字典），每个表只有一个写入方。
-2. 遗留系统中"跨文件事务"集中在少数用例（账户+客户维护、账单支付、入账），已由 ADR-004/005 明确编排归属。
-3. 演示环境用单 PostgreSQL 实例承载 6 个 database，运维成本可控，同时保留"逻辑隔离"。
+1. The mapping between aggregate roots and tables is stable (see the data dictionary), and each table has exactly one writer.
+2. In the legacy system, "cross-file transactions" are concentrated in a few use cases (account + customer maintenance, bill payment, posting), whose orchestration ownership is already defined by ADR-004/005.
+3. The demo environment runs 6 databases on a single PostgreSQL instance, keeping operational cost manageable while preserving "logical isolation".
 
-## 后果（影响与回退路径）
+## Consequences (Impact and Rollback Path)
 
-- 影响：组合查询（账户视图、授权决策）需多次 HTTP 调用；报表只能读取事务库。
-- 回退：若必须联合查询，可引入只读数据同步（CDC → 查询库），而不是恢复跨库直连。
+- Impact: composite queries (account view, authorization decisions) require multiple HTTP calls; reports can only read the transaction database.
+- Rollback: if joint queries become mandatory, introduce read-only data synchronization (CDC → query database) rather than restoring direct cross-database access.
 
-## 证据
+## Evidence
 
-- `COACTUPC.cbl:3888-4104`（跨 ACCTDAT/CUSTDAT 写）
-- `CBTRN02C.cbl:424-559`（跨 ACCTDAT/TCATBALF/TRANSACT 写）
-- `COPAUA0C.cbl:448-457`（跨 CCXREF/ACCTDAT/CUSTDAT 读）
+- `COACTUPC.cbl:3888-4104` (write across ACCTDAT/CUSTDAT)
+- `CBTRN02C.cbl:424-559` (write across ACCTDAT/TCATBALF/TRANSACT)
+- `COPAUA0C.cbl:448-457` (read across CCXREF/ACCTDAT/CUSTDAT)

@@ -1,54 +1,54 @@
-# ADR-001: 按 DDD 限界上下文拆分为 6 个微服务
+# ADR-001: Split into 6 Microservices by DDD Bounded Context
 
-| 项 | 内容 |
+| Item | Content |
 |----|------|
-| 编号 | ADR-001 |
-| 日期 | 2026-10-25 |
-| 状态 | 已接受 |
-| 关联需求 | L1 能力 C1–C15；`docs/legacy/02-five-level-model.md` |
+| ID | ADR-001 |
+| Date | 2026-10-25 |
+| Status | Accepted |
+| Related requirements | L1 capabilities C1–C15; `docs/legacy/02-five-level-model.md` |
 
-## 背景
+## Context
 
-存量系统是 CICS 单体（44 个 COBOL 程序、21 个 BMS 屏幕、12 个 VSAM 文件、3 张 DB2 表、2 个 IMS 段），
-业务能力跨客户、账户、卡片、交易、授权、用户六个语义区域，但程序之间通过 2000 字节 COMMAREA
-共享状态、直接跨文件读写（如账户更新同时写 ACCTDAT 与 CUSTDAT），没有显式边界。
-迁移必须在不丢失业务语义的前提下确定服务粒度，避免"按程序拆"（44 个服务）或"整块搬迁"（1 个服务）。
+The legacy system is a CICS monolith (44 COBOL programs, 21 BMS screens, 12 VSAM files, 3 DB2 tables, 2 IMS segments).
+Its business capabilities span six semantic areas — customer, account, card, transaction, authorization, and user — but the programs share state through a 2000-byte COMMAREA
+and read/write across files directly (for example, the account update writes both ACCTDAT and CUSTDAT), with no explicit boundaries.
+The migration must determine the service granularity without losing business semantics, avoiding both "split by program" (44 services) and "lift and shift the whole monolith" (1 service).
 
-## 候选方案
+## Alternatives
 
-| 方案 | 描述 | 优点 | 缺点 |
+| Option | Description | Pros | Cons |
 |---|---|---|---|
-| 方案A：按 DDD 限界上下文拆 6 个服务 | IAM、Customer、Card、Account、Transaction、Authorization | 边界与业务能力一致；数据所有权清晰；每服务可独立演进；团队可并行 | 跨服务用例需编排；需要处理最终一致性 |
-| 方案B：按 COBOL 程序族一对一拆分 | 每个在线/批处理程序一个服务（44 个） | 迁移映射最直观 | 分布式调用爆炸；事务边界破碎；COMMAREA 状态无处安放；运维成本极高 |
-| 方案C：单体模块化（模块化单体） | 一个 Spring Boot 应用内按包分模块 | 实现与事务最简单；初期成本最低 | 无法独立部署/扩容；与"微服务架构"目标不符 |
+| Option A: split into 6 services by DDD bounded context | IAM, Customer, Card, Account, Transaction, Authorization | Boundaries align with business capabilities; clear data ownership; each service can evolve independently; teams can work in parallel | Cross-service use cases need orchestration; eventual consistency must be handled |
+| Option B: one-to-one split by COBOL program family | One service per online/batch program (44) | Most intuitive migration mapping | Explosion of distributed calls; fragmented transaction boundaries; no place for COMMAREA state; extremely high operational cost |
+| Option C: monolith modularization (modular monolith) | Modules by package inside a single Spring Boot application | Simplest implementation and transactions; lowest initial cost | Cannot be deployed/scaled independently; does not match the "microservices architecture" goal |
 
-## 量化权衡表
+## Quantitative Trade-off Table
 
-| 方案 | 实现成本 | 性能开销 | 运维时效 | 审计性 | 风险 |
+| Option | Implementation cost | Performance overhead | Operational agility | Auditability | Risk |
 |---|---|---|---|---|---|
-| A（6 服务） | 高（6 套构建/镜像/库） | 中（跨服务 HTTP 调用 2–3 次/用例） | 分钟级独立发布 | 高（每服务独立数据与日志） | 中（分布式一致性） |
-| B（44 服务） | 极高 | 高（调用链 4+ 跳） | 分钟级但编排复杂 | 中（链路追踪缺失时难追溯） | 高 |
-| C（模块化单体） | 低 | 低 | 需整体发版 | 高 | 低（但演进受限） |
+| A (6 services) | High (6 sets of builds/images/databases) | Medium (2–3 cross-service HTTP calls per use case) | Independent releases at minute-level | High (independent data and logs per service) | Medium (distributed consistency) |
+| B (44 services) | Very high | High (4+ hops per call chain) | Minute-level but complex orchestration | Medium (hard to trace when distributed tracing is missing) | High |
+| C (modular monolith) | Low | Low | Requires whole-application release | High | Low (but evolution is constrained) |
 
-## 决策
+## Decision
 
-采用方案 A：6 个限界上下文 / 6 个可独立部署服务，数据库每服务独立。
+Adopt Option A: 6 bounded contexts / 6 independently deployable services, with a separate database per service.
 
-## 理由
+## Rationale
 
-1. 六个上下文在遗留代码中已有稳定的数据与职责聚类（`docs/legacy/01-codebase-inventory.md`）。
-2. 授权（IMS/MQ）与交易入账（批处理）的负载特征、变更频率、合规要求差异最大，必须能独立部署。
-3. 账户/客户/卡片是共享主数据，拆开后可被授权与交易服务复用，避免遗留系统中"每个程序各读一遍 VSAM"。
-4. 用户安全与业务域的关注点完全不同（安全基线 vs 账务正确性），应独立演进。
+1. The six contexts already form stable clusters of data and responsibility in the legacy code (`docs/legacy/01-codebase-inventory.md`).
+2. Authorization (IMS/MQ) and transaction posting (batch) differ the most in load characteristics, change frequency, and compliance requirements, so they must be independently deployable.
+3. Account/customer/card are shared master data; once separated they can be reused by the authorization and transaction services, avoiding the legacy pattern where "every program reads the VSAM files again".
+4. User security and the business domain have entirely different concerns (security baseline vs accounting correctness) and should evolve independently.
 
-## 后果（影响与回退路径）【L3必填】
+## Consequences (Impact and Rollback Path) [Required for L3]
 
-- 影响：跨服务同步调用、数据最终一致、部署依赖（Compose 健康检查）。
-- 回退：若跨服务调用成为瓶颈，可将 Account+Transaction+Authorization 合并为"账务域服务"（保留包边界），
-  API 契约不变；Customer/Card/IAM 保持独立。合并仅需调整 Maven 模块与 Compose 编排。
+- Impact: cross-service synchronous calls, eventual data consistency, deployment dependencies (Compose health checks).
+- Rollback: if cross-service calls become a bottleneck, Account+Transaction+Authorization can be merged into an "accounting domain service" (keeping package boundaries),
+  with unchanged API contracts; Customer/Card/IAM stay independent. The merge only requires adjusting Maven modules and Compose orchestration.
 
-## 证据
+## Evidence
 
-- `docs/legacy/01-codebase-inventory.md` 程序/数据清单
-- `docs/legacy/02-five-level-model.md` §1.2 能力清单、§2.1 聚合
+- `docs/legacy/01-codebase-inventory.md` program/data inventory
+- `docs/legacy/02-five-level-model.md` §1.2 capability inventory, §2.1 aggregates
 - `docs/design/02-bounded-contexts.md`

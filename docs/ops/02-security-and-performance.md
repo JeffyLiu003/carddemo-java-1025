@@ -1,86 +1,86 @@
-# 02 安全、性能与质量收口（P6）
+# 02 Security, Performance and Quality Closure (P6)
 
-> 范围：本地 Compose 演示环境的 NFR 目标、压测/混沌方法、安全核对与已知缺口。
-> 结论：POC 可在隔离网络演示；生产化前必须完成鉴权、TLS、限流、密钥托管与审计接入。
+> Scope: NFR targets, load/chaos testing approaches, security checklist and known gaps for the local Compose demo environment.
+> Conclusion: the POC can be demonstrated on an isolated network; before production, authentication, TLS, rate limiting, secret management and audit integration must be completed.
 
-## 1. NFR 目标（演示环境）
+## 1. NFR Targets (demo environment)
 
-| 指标 | 目标 | 验证方式 |
+| Metric | Target | Verification method |
 |---|---|---|
-| 查询接口 p95 | < 800ms | `scripts/perf/k6-smoke.js` |
-| 写接口 p95 | < 1200ms | 压测脚本扩展 |
-| 错误率 | < 1% | k6 `http_req_failed` |
-| 核心服务可用性 | 单实例，允许重启 | `docker compose ps` / health |
-| 过账幂等 | 重复请求不重复扣款 | 单测 + 冒烟 |
-| 总账一致性 | 试算平衡 `Σ借=Σ贷` | 对账/EOD |
-| 恢复时间（本地） | < 2 分钟 | 重启服务/Compose |
+| Query endpoint p95 | < 800ms | `scripts/perf/k6-smoke.js` |
+| Write endpoint p95 | < 1200ms | Extended load test scripts |
+| Error rate | < 1% | k6 `http_req_failed` |
+| Core service availability | Single instance, restarts allowed | `docker compose ps` / health |
+| Posting idempotency | Repeated requests do not debit twice | Unit tests + smoke test |
+| General ledger consistency | Trial balance `Σdebit=Σcredit` | Reconciliation/EOD |
+| Recovery time (local) | < 2 minutes | Restart the service/Compose |
 
-## 2. 性能测试
+## 2. Performance Testing
 
 ```bash
-# 需安装 k6：brew install k6
+# requires k6: brew install k6
 k6 run scripts/perf/k6-smoke.js
-# 指定入口
+# specify the entry point
 BASE_URL=http://localhost:8090 k6 run scripts/perf/k6-smoke.js
 ```
 
-脚本为只读场景（账户、额度、交易、试算平衡、对账历史），避免压测污染账务。
-写路径压测应在独立数据集上执行，并先关闭总账同步或接受降级。
+The script is a read-only scenario (accounts, limits, transactions, trial balance, reconciliation history) to avoid polluting accounting data with load tests.
+Write-path load tests should run on a separate dataset, with general ledger sync disabled first or degradation accepted.
 
-## 3. 混沌/降级
+## 3. Chaos / Degradation
 
 ```bash
 ./scripts/chaos-test.sh
 ```
 
-步骤：
+Steps:
 
-1. 记录账户 6 额度；
-2. 停止 `ledger-service`；
-3. 创建 1.00 过账批次（应成功，总账同步降级 WARN，`ledgerEntryId` 为空）；
-4. 恢复总账服务并冲正测试批次。
+1. Record the limit of account 6;
+2. Stop `ledger-service`;
+3. Create a 1.00 posting batch (it should succeed, general ledger sync degrades to WARN and `ledgerEntryId` is empty);
+4. Restore the general ledger service and reverse the test batch.
 
-验证点：资金链路不因总账不可用而失败；恢复后余额回归。
+Verification: the funds chain does not fail because the general ledger is unavailable, and the balance returns to normal after recovery.
 
-## 4. 覆盖率与架构约束
+## 4. Coverage and Architecture Constraints
 
 ```bash
-mvn verify                 # JaCoCo 报告：target/site/jacoco/index.html
-mvn -pl services/account-service test   # ArchUnit 分层约束
+mvn verify                 # JaCoCo report: target/site/jacoco/index.html
+mvn -pl services/account-service test   # ArchUnit layering constraints
 ```
 
-- JaCoCo 已在父 POM 配置 `prepare-agent` + `report`，不设硬门槛（演示环境避免阻塞）。
-- ArchUnit 示例位于 `services/account-service/src/test/java/com/carddemo/account/ArchitectureTest.java`：
-  domain 不依赖 application/infrastructure/interfaces；application 不依赖 interfaces。
-- 建议后续把 ArchUnit 复制到所有服务，并在 CI 设覆盖率门槛（核心域 ≥ 70%）。
+- JaCoCo is configured in the parent POM with `prepare-agent` + `report` and has no hard threshold (to avoid blocking in the demo environment).
+- The ArchUnit example lives in `services/account-service/src/test/java/com/carddemo/account/ArchitectureTest.java`:
+  domain does not depend on application/infrastructure/interfaces; application does not depend on interfaces.
+- It is recommended to copy ArchUnit to all services later and set coverage thresholds in CI (core domain ≥ 70%).
 
-## 5. 安全核对（OWASP Top 10 摘要）
+## 5. Security Checklist (OWASP Top 10 Summary)
 
-| 风险 | 现状 | 处置 |
+| Risk | Current state | Action |
 |---|---|---|
-| A01 访问控制 | 资源服务未强制校验 token（ADR-007） | 生产前接 API 网关/OAuth2；服务间 mTLS |
-| A02 加密失败 | 本地 HTTP；PII 日志未全量脱敏 | 全站 TLS；字段级加密；日志脱敏 |
-| A03 注入 | JPA 参数化；无字符串拼接 SQL | 保持；对外部查询做白名单 |
-| A04 不安全设计 | 无限流/防重放；支付无 cut-off | 网关限流；幂等键已有；补 cut-off |
-| A05 配置错误 | 默认密码/密钥仅演示 | 密钥托管；禁止默认值上线 |
-| A06 脆弱依赖 | 依赖由 Spring Boot BOM 管理 | CI 执行依赖扫描（见下） |
-| A07 认证失败 | 登录 PBKDF2；无 MFA | 接 MFA/设备指纹 |
-| A08 数据完整性 | 过账/总账幂等与冲正 | 保持；补事件签名 |
-| A09 日志监控 | 结构化日志 + Actuator | 接 SIEM/告警；审计服务已具备 |
-| A10 SSRF | 下游 URL 由配置注入 | 白名单校验；禁止用户可控 URL |
+| A01 Broken access control | Resource services do not enforce token validation (ADR-007) | Connect an API gateway/OAuth2 before production; mTLS between services |
+| A02 Cryptographic failures | Local HTTP; PII in logs is not fully masked | Site-wide TLS; field-level encryption; log masking |
+| A03 Injection | Parameterized JPA; no string-concatenated SQL | Maintain; whitelist external queries |
+| A04 Insecure design | No rate limiting/replay protection; payments have no cut-off | Gateway rate limiting; idempotency keys already exist; add cut-off |
+| A05 Security misconfiguration | Default passwords/keys for demo only | Secret management; never ship default values |
+| A06 Vulnerable and outdated components | Dependencies managed by the Spring Boot BOM | Run dependency scanning in CI (see below) |
+| A07 Identification and authentication failures | PBKDF2 login; no MFA | Add MFA/device fingerprinting |
+| A08 Software and data integrity failures | Posting/general ledger idempotency and reversal | Maintain; add event signing |
+| A09 Security logging and monitoring failures | Structured logs + Actuator | Connect SIEM/alerting; the audit service already exists |
+| A10 SSRF | Downstream URLs injected via configuration | Whitelist validation; user-controlled URLs are forbidden |
 
-依赖扫描建议：
+Dependency scanning recommendation:
 
 ```bash
 mvn -q dependency:tree > /tmp/deps.txt
-# 需联网/插件：
+# requires network/plugin:
 mvn org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=7
 ```
 
-## 6. 已知边界
+## 6. Known Boundaries
 
-- 未做 API 网关（web-ui 同源代理 + BFF 承担边缘职责）；
-- 未做多租户/多实体核算、账户级多币种余额；
-- 未接真实 OpenSearch、MQ、SWIFT/ISO 20022 报文；
-- 未做全链路压测环境、混沌平台、SIEM 与合规报表；
-- 扩展服务默认不启动，使用 `docker compose --profile extended up -d`。
+- No API gateway (web-ui same-origin proxy + BFF handle the edge responsibilities);
+- No multi-tenant/multi-entity accounting or account-level multi-currency balances;
+- No integration with real OpenSearch, MQ or SWIFT/ISO 20022 messages;
+- No full-chain load testing environment, chaos platform, SIEM or compliance reporting;
+- Extension services are not started by default; use `docker compose --profile extended up -d`.
