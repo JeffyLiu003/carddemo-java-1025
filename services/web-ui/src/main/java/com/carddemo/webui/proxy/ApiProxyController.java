@@ -144,6 +144,7 @@ public class ApiProxyController {
                     .uri(URI.create(url));
             copyHeader(request, spec, HttpHeaders.CONTENT_TYPE);
             copyHeader(request, spec, HttpHeaders.ACCEPT);
+            copyHeader(request, spec, HttpHeaders.ACCEPT_LANGUAGE);
             copyHeader(request, spec, HttpHeaders.AUTHORIZATION);
             copyHeader(request, spec, "X-User-Id");
             if (body != null && body.length > 0) {
