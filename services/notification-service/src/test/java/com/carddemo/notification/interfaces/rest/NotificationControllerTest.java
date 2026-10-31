@@ -112,9 +112,9 @@ class NotificationControllerTest {
                 .andExpect(jsonPath("$.templateCode").value("PAYMENT_RECEIVED"))
                 .andExpect(jsonPath("$.channel").value("EMAIL"))
                 .andExpect(jsonPath("$.status").value("SENT"))
-                .andExpect(jsonPath("$.subject").value("还款到账通知"))
+                .andExpect(jsonPath("$.subject").value("Payment received"))
                 .andExpect(jsonPath("$.body").value(
-                        "尊敬的 Alice：我们已收到您卡号 4000000000000001 的还款 100.00，当前欠款余额 1900.00。"))
+                        "Dear Alice: we have received your payment of 100.00 on card 4000000000000001. Your outstanding balance is 1900.00."))
                 .andExpect(jsonPath("$.sentAt").isNotEmpty())
                 .andExpect(jsonPath("$.error").doesNotExist());
 

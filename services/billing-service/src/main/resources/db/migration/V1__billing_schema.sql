@@ -1,4 +1,4 @@
--- 13.3 账单：账单主表（唯一 (account_id, period) 保证同账户+期间只生成一张）
+-- 13.3 Billing: statement master table (unique (account_id, period) so only one statement is generated per account and period)
 CREATE TABLE statement (
     statement_id    VARCHAR(36)    PRIMARY KEY,
     account_id      VARCHAR(11)    NOT NULL,

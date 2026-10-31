@@ -1,5 +1,5 @@
--- A1.5 催收：逾期案件、分桶与承诺还款
--- 契约见 docs/design/14-risk-credit-collections.md §6.1
+-- A1.5 Collections: delinquency cases, bucket and promise to pay
+-- Contract: docs/design/14-risk-credit-collections.md §6.1
 
 CREATE TABLE delinquency_case (
     case_id            VARCHAR(36)    PRIMARY KEY,

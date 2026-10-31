@@ -1,4 +1,4 @@
--- A1.1 账户产品化与资金冻结
+-- A1.1 Account productization and funds hold
 CREATE TABLE account_product (
     product_code          VARCHAR(20) PRIMARY KEY,
     name                  VARCHAR(60)    NOT NULL,

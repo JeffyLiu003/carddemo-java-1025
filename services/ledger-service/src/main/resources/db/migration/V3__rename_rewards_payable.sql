@@ -1,2 +1,2 @@
--- 营销能力移除：2200 科目改为通用负债，保留科目号避免影响历史分录
+-- Marketing capability removed: account 2200 becomes a generic liability; the account number is kept so historical journal lines are unaffected
 UPDATE ledger_account SET name = 'Other Payable' WHERE account_code = '2200';

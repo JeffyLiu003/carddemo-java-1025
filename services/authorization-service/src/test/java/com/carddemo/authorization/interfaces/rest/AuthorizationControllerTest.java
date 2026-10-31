@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -90,8 +91,10 @@ class AuthorizationControllerTest {
     /**
      * 请求时间戳跟随当前时间。清理接口按“系统时间 − expiryDays”判定过期，
      * 写成固定日期会让用例在若干天后失效（新授权被一并当作过期明细清理）。
+     * 用显式格式串：LocalDateTime.toString() 在秒为 0 时会省略 “:00”，断言会偶发失败。
      */
-    private static final LocalDateTime AUTH_TIMESTAMP = LocalDateTime.now().withNano(0);
+    private static final String AUTH_TIMESTAMP = LocalDateTime.now().withNano(0)
+            .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
 
     private String authorizationRequest(String amount, String transactionId) {
         return """
@@ -136,7 +139,7 @@ class AuthorizationControllerTest {
                 .andExpect(jsonPath("$.authorizationId").isNotEmpty())
                 .andExpect(jsonPath("$.cardNumber").value(CARD_NUMBER))
                 .andExpect(jsonPath("$.transactionId").value("TXN000000000001"))
-                .andExpect(jsonPath("$.authTimestamp").value(AUTH_TIMESTAMP.toString()))
+                .andExpect(jsonPath("$.authTimestamp").value(AUTH_TIMESTAMP))
                 .andExpect(jsonPath("$.responseCode").value("00"))
                 .andExpect(jsonPath("$.reasonCode").value("0000"))
                 .andExpect(jsonPath("$.accountId").value(ACCOUNT_ID))

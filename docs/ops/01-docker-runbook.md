@@ -35,7 +35,10 @@ docker compose down
 # 停止并清空数据库（Flyway 重新执行种子）
 docker compose down -v
 
-# 扩展服务（P3/P4，12 个；内存 ≥16GB 再全开）
+# the seed text of the migrations was translated in place, so an existing volume
+# fails Flyway validation ("checksum mismatch") — recreate it with the command above
+
+# extension services (P3/P4, 12 of them; only start them all with ≥16GB memory)
 docker compose --profile extended up -d
 docker compose --profile extended ps
 ```

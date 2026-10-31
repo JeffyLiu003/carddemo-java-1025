@@ -72,7 +72,7 @@ class ReferenceDataApiTest {
                 .andExpect(jsonPath("$.total").value(3))
                 .andReturn();
         assertThat(codes(body(currencies))).containsExactly("USD", "CNY", "EUR");
-        assertThat(body(currencies).get("items").get(0).get("label").asText()).isEqualTo("美元");
+        assertThat(body(currencies).get("items").get(0).get("label").asText()).isEqualTo("US Dollar");
 
         MvcResult countries = mockMvc.perform(get("/api/v1/reference/COUNTRY"))
                 .andExpect(status().isOk())
@@ -91,7 +91,7 @@ class ReferenceDataApiTest {
                 .andExpect(jsonPath("$.total").value(3))
                 .andReturn();
         assertThat(codes(body(categories))).containsExactly("CLASSIC", "GOLD", "PLATINUM");
-        assertThat(body(categories).get("items").get(2).get("label").asText()).isEqualTo("白金卡");
+        assertThat(body(categories).get("items").get(2).get("label").asText()).isEqualTo("Platinum Card");
     }
 
     @Test
@@ -100,7 +100,7 @@ class ReferenceDataApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.domain").value("CURRENCY"))
                 .andExpect(jsonPath("$.code").value("USD"))
-                .andExpect(jsonPath("$.label").value("美元"))
+                .andExpect(jsonPath("$.label").value("US Dollar"))
                 .andExpect(jsonPath("$.active").value(true));
     }
 

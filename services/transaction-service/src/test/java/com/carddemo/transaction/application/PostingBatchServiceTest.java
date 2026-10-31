@@ -73,7 +73,7 @@ class PostingBatchServiceTest {
 
         PostingBatch batch = view.batch();
         assertThat(batch.getStatus()).isEqualTo(PostingStatus.POSTED);
-        assertThat(view.typeName()).isEqualTo("信用卡消费");
+        assertThat(view.typeName()).isEqualTo("Credit card purchase");
         assertThat(batch.getAmount()).isEqualByComparingTo("25.00");
         assertThat(batch.getCurrency()).isEqualTo("USD");
         assertThat(legSummary(batch.getLegs())).containsExactly("DR:1100", "CR:2100");
@@ -96,7 +96,7 @@ class PostingBatchServiceTest {
         PostingBatchView second = postingBatchService.create(command("post-0003", "CARD_PURCHASE", "25.00"));
 
         assertThat(second.batch().getBatchId()).isEqualTo(first.batch().getBatchId());
-        assertThat(second.typeName()).isEqualTo("信用卡消费");
+        assertThat(second.typeName()).isEqualTo("Credit card purchase");
         verify(accountClient, times(1)).applyPosting(ACCOUNT_ID, new BigDecimal("25.00"));
         assertThat(postingBatches.findByIdempotencyKey("post-0003")).isPresent();
     }

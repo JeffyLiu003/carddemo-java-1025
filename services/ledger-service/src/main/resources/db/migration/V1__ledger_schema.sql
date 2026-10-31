@@ -1,4 +1,4 @@
--- A1.3 总账：科目表、会计期间、日记账
+-- A1.3 General ledger: chart of accounts, accounting periods, journal entries
 CREATE TABLE ledger_account (
     account_code VARCHAR(20) PRIMARY KEY,
     name         VARCHAR(80) NOT NULL,

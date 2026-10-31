@@ -1,4 +1,4 @@
--- 取自 docs/design/05-api-catalog.md §0 的 9 张卡（卡号/账户/客户/到期日/状态/卡面名逐字段一致）
+-- The 9 cards from docs/design/05-api-catalog.md §0 (card number/account/customer/expiry/status/card name match field by field)
 INSERT INTO card (card_number, account_id, customer_id, cvv, embossed_name, expiration_date, active_status, version)
 VALUES ('0500024453765740', '00000000001', '000000001', '074', 'IMMANUEL KESSLER', '2028-05-20', 'Y', 0),
        ('6677889900112233', '00000000001', '000000001', '886', 'IMANUEL KESSLER', '2029-01-01', 'Y', 0),
@@ -10,7 +10,7 @@ VALUES ('0500024453765740', '00000000001', '000000001', '074', 'IMMANUEL KESSLER
        ('4455667788990011', '00000000007', '000000007', '127', 'DANIEL WHITFIELD', '2024-05-05', 'N', 0),
        ('5566778899001122', '00000000008', '000000008', '555', 'AISHA BENNETT', '2030-09-30', 'Y', 0);
 
--- CARDXREF：与 card 一一对应（遗留 XREFFILE，CXACAIX 按账户号检索）
+-- CARDXREF: one-to-one with card (legacy XREFFILE; CXACAIX looks it up by account number)
 INSERT INTO card_xref (card_number, customer_id, account_id)
 VALUES ('0500024453765740', '000000001', '00000000001'),
        ('6677889900112233', '000000001', '00000000001'),

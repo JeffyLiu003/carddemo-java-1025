@@ -71,11 +71,11 @@ class PostingBatchControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(7))
                 .andExpect(jsonPath("$.items[0].typeCode").value("ADJUSTMENT"))
-                .andExpect(jsonPath("$.items[0].name").value("调账"))
+                .andExpect(jsonPath("$.items[0].name").value("Adjustment"))
                 .andExpect(jsonPath("$.items[0].accountEffect").value("INCREASE"))
                 .andExpect(jsonPath("$.items[0].active").value(true))
                 .andExpect(jsonPath("$.items[1].typeCode").value("CARD_PURCHASE"))
-                .andExpect(jsonPath("$.items[1].name").value("信用卡消费"))
+                .andExpect(jsonPath("$.items[1].name").value("Credit card purchase"))
                 .andExpect(jsonPath("$.items[5].typeCode").value("PAYMENT"))
                 .andExpect(jsonPath("$.items[5].accountEffect").value("DECREASE"));
     }
@@ -111,7 +111,7 @@ class PostingBatchControllerTest {
                 .andExpect(jsonPath("$.batchId").isNotEmpty())
                 .andExpect(jsonPath("$.idempotencyKey").value("post-1001"))
                 .andExpect(jsonPath("$.typeCode").value("CARD_PURCHASE"))
-                .andExpect(jsonPath("$.typeName").value("信用卡消费"))
+                .andExpect(jsonPath("$.typeName").value("Credit card purchase"))
                 .andExpect(jsonPath("$.accountId").value(ACCOUNT_ID))
                 .andExpect(jsonPath("$.amount").value(25.00))
                 .andExpect(jsonPath("$.currency").value("USD"))
@@ -213,7 +213,7 @@ class PostingBatchControllerTest {
         mockMvc.perform(get("/api/v1/posting-batches/{batchId}", batchId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.batchId").value(batchId))
-                .andExpect(jsonPath("$.typeName").value("还款"))
+                .andExpect(jsonPath("$.typeName").value("Payment"))
                 .andExpect(jsonPath("$.legs[0].direction").value("DR"))
                 .andExpect(jsonPath("$.legs[0].ledgerAccountCode").value("1000"))
                 .andExpect(jsonPath("$.legs[1].ledgerAccountCode").value("1100"));

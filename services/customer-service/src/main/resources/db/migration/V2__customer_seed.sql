@@ -1,6 +1,6 @@
--- 取自 docs/design/05-api-catalog.md §0 的 8 个种子客户（姓名/城市/州/邮编/FICO/主卡标志一致），
--- 地址行、电话、SSN、出生日期、EFT 账号为合规的合理补齐值。
--- 电话统一 (999)999-9999；SSN 首段避开 000/666/900-999。
+-- The 8 seed customers from docs/design/05-api-catalog.md §0 (name/city/state/zip/FICO/primary-card flag match),
+-- Address line, phone, SSN, date of birth and EFT account are compliance-safe filler values.
+-- Phone is always (999)999-9999; the SSN area number avoids 000/666/900-999.
 INSERT INTO customer (customer_id, first_name, middle_name, last_name, address_line1, address_line2,
                       address_line3, state_code, country_code, zip_code, phone_number1, phone_number2,
                       ssn, date_of_birth, eft_account_id, primary_card_holder, fico_score, version)

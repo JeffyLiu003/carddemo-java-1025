@@ -1,4 +1,4 @@
--- 支付指令表。契约见 docs/design/13-payments-billing-limits-fx.md §2.1
+-- Payment instruction table. Contract: docs/design/13-payments-billing-limits-fx.md §2.1
 -- status: RECEIVED / SCREENED / ACCEPTED / SETTLED / RETURNED / REJECTED
 -- payment_type: ACH / SEPA / WIRE / INSTANT
 

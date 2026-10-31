@@ -1,4 +1,4 @@
--- 每个微服务独立数据库（ADR-003）
+-- One database per microservice (ADR-003)
 CREATE DATABASE carddemo_iam;
 CREATE DATABASE carddemo_customer;
 CREATE DATABASE carddemo_card;

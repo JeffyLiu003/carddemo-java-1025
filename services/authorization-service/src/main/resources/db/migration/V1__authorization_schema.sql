@@ -1,4 +1,4 @@
--- 授权上下文表结构。对应遗留 IMS PAUTSUM0（汇总段）/PAUTDTL1（明细段）与 DB2 AUTHFRDS。
+-- Authorization context schema. Maps to legacy IMS PAUTSUM0 (summary segment)/PAUTDTL1 (detail segment) and DB2 AUTHFRDS.
 
 CREATE TABLE auth_summary (
     account_id      VARCHAR(11) PRIMARY KEY,
@@ -13,7 +13,7 @@ CREATE TABLE auth_summary (
     version         BIGINT         NOT NULL DEFAULT 0
 );
 
--- 授权明细（遗留 AUTHFRDS）。fraud_flag 取代 AUTH_FRAUD。
+-- Authorization details (legacy AUTHFRDS). fraud_flag replaces AUTH_FRAUD.
 CREATE TABLE auth_detail (
     authorization_id       VARCHAR(36) PRIMARY KEY,
     card_number            VARCHAR(16)    NOT NULL,
@@ -46,7 +46,7 @@ CREATE TABLE auth_detail (
 CREATE INDEX idx_auth_detail_account ON auth_detail (account_id, auth_timestamp);
 CREATE INDEX idx_auth_detail_card ON auth_detail (card_number, auth_timestamp);
 
--- 卡级欺诈标记（BR-AUTH-06）。标记后该卡后续授权一律拒绝 5100。
+-- Card-level fraud flag (BR-AUTH-06). Once flagged, every later authorization on the card is declined with 5100.
 CREATE TABLE card_fraud_flag (
     card_number      VARCHAR(16) PRIMARY KEY,
     flagged_at       TIMESTAMP   NOT NULL,

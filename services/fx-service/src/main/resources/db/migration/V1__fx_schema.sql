@@ -1,4 +1,4 @@
--- P2 外汇：汇率、报价、换汇记录，对齐 docs/design/13-payments-billing-limits-fx.md §5.1
+-- P2 FX: rates, quotes and conversion records, aligned with docs/design/13-payments-billing-limits-fx.md §5.1
 CREATE TABLE fx_rate (
     pair_id        VARCHAR(36)    PRIMARY KEY,
     base_currency  VARCHAR(3)     NOT NULL,

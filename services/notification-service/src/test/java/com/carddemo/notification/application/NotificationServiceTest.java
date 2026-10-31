@@ -55,9 +55,9 @@ class NotificationServiceTest {
         assertThat(view.notification().getSentAt()).isNotNull();
         assertThat(view.notification().getError()).isNull();
         assertThat(view.notification().getChannel()).isEqualTo(Channel.EMAIL);
-        assertThat(view.subject()).isEqualTo("还款到账通知");
+        assertThat(view.subject()).isEqualTo("Payment received");
         assertThat(view.body()).isEqualTo(
-                "尊敬的 Alice：我们已收到您卡号 4000000000000001 的还款 100.00，当前欠款余额 1900.00。");
+                "Dear Alice: we have received your payment of 100.00 on card 4000000000000001. Your outstanding balance is 1900.00.");
         assertThat(view.payload()).containsEntry("name", "Alice");
 
         NotificationView reloaded = notifications.get(view.notification().getNotificationId());
@@ -69,8 +69,8 @@ class NotificationServiceTest {
     void rendersMissingVariablesAsEmptyStringWhenPayloadIncomplete() {
         NotificationView view = create(PAYMENT, ALICE, Map.of("name", "Alice"));
 
-        assertThat(view.body()).doesNotContain("{{").contains("尊敬的 Alice：");
-        assertThat(view.body()).isEqualTo("尊敬的 Alice：我们已收到您卡号  的还款 ，当前欠款余额 。");
+        assertThat(view.body()).doesNotContain("{{").contains("Dear Alice:");
+        assertThat(view.body()).isEqualTo("Dear Alice: we have received your payment of  on card . Your outstanding balance is .");
     }
 
     @Test
@@ -79,7 +79,7 @@ class NotificationServiceTest {
 
         assertThat(view.notification().getChannel()).isEqualTo(Channel.SMS);
         assertThat(view.subject()).isEmpty();
-        assertThat(view.body()).isEqualTo("您的验证码是 123456，5 分钟内有效，请勿泄露。");
+        assertThat(view.body()).isEqualTo("Your verification code is 123456. It is valid for 5 minutes; do not share it.");
         assertThat(view.notification().getStatus()).isEqualTo(NotificationStatus.SENT);
     }
 
