@@ -1,2 +1,2 @@
--- 营销能力移除：删除返现入账幂等表（V3 为历史迁移，保留以维持 Flyway 校验和）
+-- Marketing capability removed: drops the cashback idempotency table (V3 stays as a historical migration to keep Flyway checksums intact)
 DROP TABLE IF EXISTS reward_credit;

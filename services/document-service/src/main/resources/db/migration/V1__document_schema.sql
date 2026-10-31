@@ -1,6 +1,6 @@
--- 文档上下文表结构，契约见 docs/design/15-operations-support.md §4.1
+-- Document context schema; contract in docs/design/15-operations-support.md §4.1
 -- status: ACTIVE / ARCHIVED
--- content_text 使用 TEXT：PostgreSQL 原生 text，H2 解析为 CHARACTER LARGE OBJECT（CLOB）
+-- content_text uses TEXT: native text on PostgreSQL, parsed as CHARACTER LARGE OBJECT (CLOB) on H2
 
 CREATE TABLE document_metadata (
     document_id   VARCHAR(36)  PRIMARY KEY,

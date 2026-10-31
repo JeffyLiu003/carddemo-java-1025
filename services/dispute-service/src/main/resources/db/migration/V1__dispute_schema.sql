@@ -1,4 +1,4 @@
--- 争议上下文表结构，契约见 docs/design/14-risk-credit-collections.md §5.1
+-- Dispute context schema; contract in docs/design/14-risk-credit-collections.md §5.1
 -- status: OPEN / UNDER_REVIEW / PROVISIONAL_CREDIT / CHARGEBACK / WON / LOST / CLOSED
 
 CREATE TABLE dispute_case (

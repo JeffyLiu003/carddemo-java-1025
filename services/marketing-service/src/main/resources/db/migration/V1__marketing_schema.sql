@@ -1,5 +1,5 @@
--- 17.3 营销：高端卡期限活动 / 报名 / 返现发放
--- 契约见 docs/design/17-premium-cashback-campaign.md §3.1
+-- 17.3 Marketing: premium card term campaigns / enrollments / cashback grants
+-- Contract: docs/design/17-premium-cashback-campaign.md §3.1
 
 CREATE TABLE campaign (
     campaign_id                    VARCHAR(36)    PRIMARY KEY,

@@ -1,6 +1,6 @@
--- AML 名单筛查表结构，对齐 docs/design/14-risk-credit-collections.md §4.1
+-- AML watchlist screening schema, aligned with docs/design/14-risk-credit-collections.md §4.1
 
--- 制裁/名单条目：normalized_name 用于匹配，避免每次筛查重复归一化。
+-- Sanctions/watchlist entries: normalized_name is stored for matching so each screening does not re-normalize the text.
 CREATE TABLE sanctions_entry (
     entry_id        VARCHAR(36)  PRIMARY KEY,
     name            VARCHAR(100) NOT NULL,
@@ -14,7 +14,7 @@ CREATE TABLE sanctions_entry (
 
 CREATE INDEX idx_sanctions_entry_normalized ON sanctions_entry (normalized_name);
 
--- 筛查结果（不可变记录）：CLEAR/POTENTIAL_MATCH/BLOCKED。
+-- Screening results (immutable records): CLEAR/POTENTIAL_MATCH/BLOCKED.
 CREATE TABLE screening_result (
     screening_id     VARCHAR(36)  PRIMARY KEY,
     name             VARCHAR(100) NOT NULL,
@@ -28,7 +28,7 @@ CREATE TABLE screening_result (
 
 CREATE INDEX idx_screening_result_result ON screening_result (result, created_at);
 
--- 人工处置队列：POTENTIAL_MATCH/BLOCKED 生成 OPEN 警报。
+-- Manual disposition queue: POTENTIAL_MATCH/BLOCKED produce OPEN alerts.
 CREATE TABLE aml_alert (
     alert_id     VARCHAR(36)  PRIMARY KEY,
     screening_id VARCHAR(36)  NOT NULL,

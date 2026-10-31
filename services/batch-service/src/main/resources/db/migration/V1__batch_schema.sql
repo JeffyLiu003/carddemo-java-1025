@@ -1,5 +1,5 @@
--- A1.6 批处理：作业定义与作业运行
--- 契约见 docs/design/14-risk-credit-collections.md §7.1
+-- A1.6 Batch processing: job definitions and job runs
+-- Contract: docs/design/14-risk-credit-collections.md §7.1
 
 CREATE TABLE job_definition (
     job_code       VARCHAR(32)  PRIMARY KEY,

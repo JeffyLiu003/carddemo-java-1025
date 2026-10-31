@@ -1,4 +1,4 @@
--- 审计事件：只追加（应用层不提供 UPDATE/DELETE），payload 保存原始 JSON 文本
+-- Audit events: append-only (the application layer exposes no UPDATE/DELETE); payload keeps the original JSON text
 CREATE TABLE audit_event (
     event_id      VARCHAR(36) PRIMARY KEY,
     actor         VARCHAR(64) NOT NULL,

@@ -1,5 +1,5 @@
--- A1.4 对账与 EOD：对账运行 / 对账明细 / EOD 运行
--- 契约见 docs/design/12-reconciliation-and-eod.md §3
+-- A1.4 Reconciliation and EOD: reconciliation runs / items / EOD runs
+-- Contract: docs/design/12-reconciliation-and-eod.md §3
 
 CREATE TABLE reconciliation_run (
     run_id                VARCHAR(36)   PRIMARY KEY,

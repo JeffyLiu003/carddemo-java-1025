@@ -1,4 +1,4 @@
--- 流程上下文表结构，契约见 docs/design/15-operations-support.md §5.1
+-- Workflow context schema; contract in docs/design/15-operations-support.md §5.1
 -- workflow_task.status: PENDING / APPROVED / REJECTED
 
 CREATE TABLE workflow_definition (

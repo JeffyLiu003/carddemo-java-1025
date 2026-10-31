@@ -1,4 +1,4 @@
--- 参考数据码表：同一 (domain, code) 唯一
+-- Reference data code tables: (domain, code) is unique
 CREATE TABLE reference_item (
     item_id    VARCHAR(36) PRIMARY KEY,
     domain     VARCHAR(32) NOT NULL,

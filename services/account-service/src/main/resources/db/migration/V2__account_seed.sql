@@ -1,4 +1,4 @@
--- 取自 carddemo-cobol/app/data/ASCII/acctdata.txt 的示例账户（数值已按 copybook 语义归一化）
+-- Sample accounts taken from carddemo-cobol/app/data/ASCII/acctdata.txt (values normalized to copybook semantics)
 INSERT INTO account (account_id, active_status, current_balance, credit_limit, cash_credit_limit,
                      open_date, expiration_date, reissue_date, current_cycle_credit, current_cycle_debit,
                      address_zip, group_id, version)

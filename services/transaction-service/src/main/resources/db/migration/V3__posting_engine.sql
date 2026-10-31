@@ -1,5 +1,5 @@
--- A1.2 过账引擎：过账类型 / 过账规则 / 过账批次 / 过账分录
--- 契约见 docs/design/11-money-path-slice-a2.md §2.1–2.2
+-- A1.2 Posting engine: posting types / posting rules / posting batches / posting entries
+-- Contract: docs/design/11-money-path-slice-a2.md §2.1-2.2
 
 CREATE TABLE posting_type (
     type_code      VARCHAR(20) PRIMARY KEY,
@@ -40,7 +40,7 @@ CREATE TABLE posting_batch (
     CONSTRAINT uk_posting_batch_idempotency UNIQUE (idempotency_key)
 );
 
--- 一个原批次最多一个冲正批次（冲正批次的幂等键为 reversal:<原批次号>）
+-- At most one reversal batch per original batch (the reversal batch idempotency key is reversal:<original batch id>)
 CREATE UNIQUE INDEX uk_posting_batch_reversal_of ON posting_batch (reversal_of);
 CREATE INDEX idx_posting_batch_account ON posting_batch (account_id);
 CREATE INDEX idx_posting_batch_created ON posting_batch (created_at);
@@ -58,17 +58,17 @@ CREATE TABLE posting_leg (
     CONSTRAINT fk_posting_leg_batch FOREIGN KEY (batch_id) REFERENCES posting_batch (batch_id)
 );
 
--- 过账类型（契约 §2.2）
+-- Posting types (contract §2.2)
 INSERT INTO posting_type (type_code, name, description, account_effect, active, version) VALUES
-    ('CARD_PURCHASE', '信用卡消费', '持卡人在商户消费，计入应收账款', 'INCREASE', TRUE, 0),
-    ('CASH_ADVANCE', '现金预支', 'ATM / 柜面预支现金，计入应收账款', 'INCREASE', TRUE, 0),
-    ('FEE', '费用', '年费、滞纳金等费用计入应收账款', 'INCREASE', TRUE, 0),
-    ('INTEREST', '利息', '循环利息计入应收账款', 'INCREASE', TRUE, 0),
-    ('PAYMENT', '还款', '客户还款冲减应收账款', 'DECREASE', TRUE, 0),
-    ('REFUND', '退款', '商户退款冲减应收账款', 'DECREASE', TRUE, 0),
-    ('ADJUSTMENT', '调账', '人工调账计入应收账款', 'INCREASE', TRUE, 0);
+    ('CARD_PURCHASE', 'Credit card purchase', 'Cardholder purchase at a merchant, posted to receivables', 'INCREASE', TRUE, 0),
+    ('CASH_ADVANCE', 'Cash advance', 'Cash withdrawn at an ATM or counter, posted to receivables', 'INCREASE', TRUE, 0),
+    ('FEE', 'Fee', 'Annual fees, late fees and similar charges posted to receivables', 'INCREASE', TRUE, 0),
+    ('INTEREST', 'Interest', 'Revolving interest posted to receivables', 'INCREASE', TRUE, 0),
+    ('PAYMENT', 'Payment', 'Customer payment that reduces receivables', 'DECREASE', TRUE, 0),
+    ('REFUND', 'Refund', 'Merchant refund that reduces receivables', 'DECREASE', TRUE, 0),
+    ('ADJUSTMENT', 'Adjustment', 'Manual adjustment posted to receivables', 'INCREASE', TRUE, 0);
 
--- 过账规则（契约 §2.2 的 DR / CR 分录）
+-- Posting rules (the DR / CR entries in contract §2.2)
 INSERT INTO posting_rule (type_code, leg_no, account_role, direction, ledger_account_code, description, version) VALUES
     ('CARD_PURCHASE', 1, 'CARD_RECEIVABLE', 'DR', '1100', 'Card receivable increases', 0),
     ('CARD_PURCHASE', 2, 'MERCHANT_PAYABLE', 'CR', '2100', 'Merchant payable increases', 0),

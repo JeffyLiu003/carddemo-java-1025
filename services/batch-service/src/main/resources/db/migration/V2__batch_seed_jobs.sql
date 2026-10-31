@@ -1,7 +1,7 @@
--- 种子作业：计息 → transaction-service、对账 → reconciliation-service（设计 §7.1）
+-- Seed jobs: interest accrual → transaction-service, reconciliation → reconciliation-service (design §7.1)
 
 INSERT INTO job_definition (job_code, name, description, target_service, active, version) VALUES
-    ('INTEREST_RUN', '计息作业',
-     'EOD 计息：调用 transaction-service 对全部账户计提循环利息', 'transaction', TRUE, 0),
-    ('RECONCILIATION', '对账作业',
-     'EOD 对账：调用 reconciliation-service 执行当日过账与总账对账', 'reconciliation', TRUE, 0);
+    ('INTEREST_RUN', 'Interest run',
+     'EOD interest accrual: calls transaction-service to accrue revolving interest for all accounts', 'transaction', TRUE, 0),
+    ('RECONCILIATION', 'Reconciliation run',
+     'EOD reconciliation: calls reconciliation-service to compare the postings and general ledger for the business day', 'reconciliation', TRUE, 0);

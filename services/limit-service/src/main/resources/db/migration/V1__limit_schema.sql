@@ -1,4 +1,4 @@
--- P2 限额：客户/账户/渠道限额与用量，对齐 docs/design/13-payments-billing-limits-fx.md §4.1
+-- P2 Limits: customer/account/channel limits and usage, aligned with docs/design/13-payments-billing-limits-fx.md §4.1
 CREATE TABLE limit_definition (
     limit_id    VARCHAR(36)    PRIMARY KEY,
     scope_type  VARCHAR(16)    NOT NULL,

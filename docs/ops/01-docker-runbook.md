@@ -35,6 +35,9 @@ docker compose down
 # stop and wipe the databases (Flyway re-runs the seeds)
 docker compose down -v
 
+# the seed text of the migrations was translated in place, so an existing volume
+# fails Flyway validation ("checksum mismatch") — recreate it with the command above
+
 # extension services (P3/P4, 12 of them; only start them all with ≥16GB memory)
 docker compose --profile extended up -d
 docker compose --profile extended ps

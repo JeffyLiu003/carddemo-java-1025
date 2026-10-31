@@ -1,4 +1,4 @@
--- 信贷上下文表结构，契约见 docs/design/14-risk-credit-collections.md §2.1
+-- Loan context schema; contract in docs/design/14-risk-credit-collections.md §2.1
 -- loan_application.status: SUBMITTED / APPROVED / REJECTED / DISBURSED / CLOSED
 -- loan.status: ACTIVE / CLOSED
 -- repayment_schedule.status: PENDING / PAID

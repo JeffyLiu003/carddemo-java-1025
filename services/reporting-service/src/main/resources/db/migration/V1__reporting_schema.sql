@@ -1,5 +1,5 @@
--- P4 运营支撑：报表定义 / 报表运行 / 报表结果行
--- 契约见 docs/design/15-operations-support.md §2.1
+-- P4 Operations support: report definitions / report runs / report result rows
+-- Contract: docs/design/15-operations-support.md §2.1
 
 CREATE TABLE report_definition (
     report_code    VARCHAR(40)  PRIMARY KEY,

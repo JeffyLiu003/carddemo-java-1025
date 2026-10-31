@@ -33,7 +33,7 @@ class TransactionClientTest {
     private static String batchJson(String batchId, String createdAt) {
         return """
                 {"batchId":"%s","idempotencyKey":"idem-%s","typeCode":"CARD_PURCHASE",
-                 "typeName":"信用卡消费","accountId":"00000000006","amount":25.00,"currency":"USD",
+                 "typeName":"Credit card purchase","accountId":"00000000006","amount":25.00,"currency":"USD",
                  "description":"Card purchase","status":"POSTED","ledgerEntryId":"JE-1",
                  "createdAt":"%s","legs":[
                    {"legNo":1,"accountRole":"CARD_RECEIVABLE","direction":"DR",

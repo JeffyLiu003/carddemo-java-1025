@@ -1,6 +1,6 @@
--- 交易参照数据与交易种子，逐条对齐 docs/design/05-api-catalog.md §0
+-- Transaction reference data and transaction seed, matching docs/design/05-api-catalog.md §0 line by line
 
--- 交易类型（CVTRA03Y / trantype.txt）
+-- Transaction types (CVTRA03Y / trantype.txt)
 INSERT INTO tran_type (type_code, description) VALUES
     ('01', 'Purchase'),
     ('02', 'Payment'),
@@ -10,7 +10,7 @@ INSERT INTO tran_type (type_code, description) VALUES
     ('06', 'Reversal'),
     ('07', 'Adjustment');
 
--- 交易类别（CVTRA04Y / trancatg.txt，契约 §0 列出的 11 组）
+-- Transaction categories (CVTRA04Y / trancatg.txt; the 11 groups listed in contract §0)
 INSERT INTO tran_category (type_code, category_code, description) VALUES
     ('01', '0001', 'Regular Sales Draft'),
     ('01', '0002', 'Regular Cash Advance'),
@@ -24,7 +24,7 @@ INSERT INTO tran_category (type_code, category_code, description) VALUES
     ('06', '0001', 'Reversal'),
     ('07', '0001', 'Adjustment');
 
--- 披露组（CVTRA02Y），A000000000 为契约账户组，DEFAULT 为利率回退组
+-- Disclosure groups (CVTRA02Y); A000000000 is the contract account group and DEFAULT the interest-rate fallback group
 INSERT INTO disclosure_group (group_id, type_code, category_code, interest_rate) VALUES
     ('A000000000', '01', '0001', 18.00),
     ('A000000000', '01', '0002', 24.00),
@@ -49,7 +49,7 @@ INSERT INTO disclosure_group (group_id, type_code, category_code, interest_rate)
     ('DEFAULT', '06', '0001', 0.00),
     ('DEFAULT', '07', '0001', 0.00);
 
--- 类别累计（TCATBALF）
+-- Category balances (TCATBALF)
 INSERT INTO tran_category_balance (account_id, type_code, category_code, balance, version) VALUES
     ('00000000001', '01', '0001', 1200.00, 0),
     ('00000000001', '01', '0002', 500.00, 0),
@@ -59,7 +59,7 @@ INSERT INTO tran_category_balance (account_id, type_code, category_code, balance
     ('00000000006', '01', '0001', 1500.00, 0),
     ('00000000008', '01', '0001', 2000.00, 0);
 
--- 交易种子（TRANSACT），账户号与卡号映射取自契约卡片表
+-- Transaction seed (TRANSACT); account-to-card mapping taken from the contract card table
 INSERT INTO transaction (transaction_id, account_id, card_number, type_code, category_code, source, description,
                          amount, merchant_id, merchant_name, merchant_city, merchant_zip,
                          original_timestamp, processed_timestamp, status, version) VALUES

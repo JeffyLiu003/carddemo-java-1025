@@ -51,7 +51,7 @@ class WorkflowControllerTest {
                 .andExpect(jsonPath("$.items[0].definitionCode").value("DISPUTE_REVIEW"))
                 .andExpect(jsonPath("$.items[0].steps", hasSize(2)))
                 .andExpect(jsonPath("$.items[1].definitionCode").value("LIMIT_INCREASE"))
-                .andExpect(jsonPath("$.items[1].name").value("额度提升审批"))
+                .andExpect(jsonPath("$.items[1].name").value("Limit increase approval"))
                 .andExpect(jsonPath("$.items[1].steps[0]").value("REQUEST"))
                 .andExpect(jsonPath("$.items[1].steps[2]").value("APPROVE"))
                 .andExpect(jsonPath("$.items[1].active").value(true))

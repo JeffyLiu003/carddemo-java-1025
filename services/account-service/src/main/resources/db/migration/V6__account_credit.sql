@@ -1,4 +1,4 @@
--- 通用账户贷记（返现冲减欠款等），credit_id 作为幂等键（docs/design/17-premium-cashback-campaign.md §3.2）
+-- Generic account credit (cashback offsetting the balance owed, and similar), with credit_id as the idempotency key (docs/design/17-premium-cashback-campaign.md §3.2)
 CREATE TABLE account_credit (
     credit_id   VARCHAR(36) PRIMARY KEY,
     account_id  VARCHAR(11)    NOT NULL,

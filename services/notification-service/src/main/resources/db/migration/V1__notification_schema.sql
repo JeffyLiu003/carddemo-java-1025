@@ -1,5 +1,5 @@
--- P4 运营支撑：通知模板 / 通知
--- 契约见 docs/design/15-operations-support.md §3.1
+-- P4 Operations support: notification templates / notifications
+-- Contract: docs/design/15-operations-support.md §3.1
 
 CREATE TABLE notification_template (
     template_code VARCHAR(40)   PRIMARY KEY,
