@@ -1,52 +1,52 @@
-# ADR-011: 对账只读与差异处理边界
+# ADR-011: Read-Only Reconciliation and the Boundary of Difference Handling
 
-| 项 | 内容 |
+| Item | Content |
 |----|------|
-| 编号 | ADR-011 |
-| 日期 | 2026-10-26 |
-| 状态 | 已接受 |
-| 关联需求 | `docs/design/12-reconciliation-and-eod.md`、A1.4 |
+| ID | ADR-011 |
+| Date | 2026-10-26 |
+| Status | Accepted |
+| Related requirements | `docs/design/12-reconciliation-and-eod.md`, A1.4 |
 
-## 背景
+## Context
 
-A1.4 引入对账：比较过账批次与总账日记账，识别缺失、金额不符、孤儿分录与试算不平衡。
-对账发现差异后，系统可以：
+A1.4 introduced reconciliation: comparing posting batches with general ledger journal entries to identify missing entries, amount mismatches, orphan entries, and trial balance imbalances.
+After reconciliation finds differences, the system could:
 
-1. 自动修改业务/总账数据使两边一致；
-2. 只记录差异，由人工确认后另行调账；
-3. 直接阻断交易。
+1. Automatically modify business/general ledger data so both sides match;
+2. Only record the differences and let a human confirm and adjust separately;
+3. Block transactions outright.
 
-需要决定对账服务的写权限边界，以及 EOD 的职责。
+The write-permission boundary of the reconciliation service and the responsibilities of EOD must be decided.
 
-## 候选方案
+## Alternatives
 
-| 方案 | 描述 | 优点 | 缺点 |
+| Option | Description | Pros | Cons |
 |---|---|---|---|
-| A：对账可自动调账 | 发现差异后写反向分录/改余额 | 自动化程度高 | 对账错误会二次破坏账务；审计不可接受 |
-| B：只读 + 差异登记 + 人工处理（采用） | 对账只读；差异落库，可登记说明；调账走正常过账/手工分录 | 审计清晰；失败不影响账务 | 需要人工闭环；差异处理与调账是两步 |
-| C：对账阻断交易 | 差异未清零前禁止新交易 | 强一致 | 可用性差；历史差异会长期阻塞业务 |
+| A: reconciliation can adjust entries automatically | Write reverse entries/change balances after finding differences | Highly automated | Reconciliation errors would damage accounting a second time; unacceptable for audit |
+| B: read-only + difference registry + manual handling (adopted) | Reconciliation is read-only; differences are persisted and can be annotated; adjustments go through normal posting/manual entries | Clear audit trail; failures do not affect accounting | Requires a manual closed loop; difference handling and adjustment are two steps |
+| C: reconciliation blocks transactions | Forbid new transactions until differences are cleared | Strong consistency | Poor availability; historical differences would block business for a long time |
 
-## 决策
+## Decision
 
-采用方案 B：
+Adopt Option B:
 
-1. `reconciliation-service` 只通过 GET 读取 transaction 的过账批次、ledger 的日记账与试算平衡，
-   不写任何账务数据。
-2. 差异写入 `reconciliation_item`，状态为 `MISSING_JOURNAL`、`MISSING_BATCH`、`AMOUNT_MISMATCH`、`UNBALANCED`；
-   `resolve` 只更新 `resolved` 与 `resolution_note`，不触发调账。
-3. 真正的调账必须走 transaction 的过账批次或 ledger 的手工日记账，保留完整审计链。
-4. EOD 作为作业入口，当前只编排对账；不自动关账、不改余额。
-5. 对账范围当前为“批次 ↔ 日记账 + 试算平衡”；账户余额 vs 总账 1100 需要按账户子账，暂不纳入。
+1. `reconciliation-service` reads transaction posting batches and ledger journal entries and trial balance only via GET,
+   and does not write any accounting data.
+2. Differences are written to `reconciliation_item` with status `MISSING_JOURNAL`, `MISSING_BATCH`, `AMOUNT_MISMATCH`, `UNBALANCED`;
+   `resolve` only updates `resolved` and `resolution_note` and does not trigger adjustments.
+3. Real adjustments must go through transaction posting batches or ledger manual journal entries, preserving the full audit chain.
+4. EOD serves as the job entry point and currently only orchestrates reconciliation; it does not close periods or change balances automatically.
+5. The current reconciliation scope is "batch ↔ journal entry + trial balance"; account balance vs general ledger 1100 requires per-account sub-ledgers and is not included for now.
 
-## 后果
+## Consequences
 
-- 差异需要人工跟进；系统提供“已处理”标记与说明，便于审计。
-- 对账失败不阻塞交易，符合“资金事实优先”的原则。
-- 后续若引入自动调账，应以新的过账批次/日记账实现，而不是直接改余额。
-- 对账拉取采用分页读取（每页 500、最多 40 页）；数据量增大后应下推到服务端按日期过滤。
+- Differences require manual follow-up; the system provides a "resolved" marker and notes to facilitate auditing.
+- Reconciliation failures do not block transactions, consistent with the principle of "money facts first".
+- If automatic adjustment is introduced later, it should be implemented as new posting batches/journal entries rather than directly changing balances.
+- Reconciliation pulls data with paginated reads (500 per page, at most 40 pages); as data volume grows, filtering by date should be pushed down to the server side.
 
-## 证据
+## Evidence
 
-- `docs/design/12-reconciliation-and-eod.md` §2、§5
+- `docs/design/12-reconciliation-and-eod.md` §2, §5
 - `docs/design/adr/ADR-010-ledger-and-posting-separation.md`
 - `services/reconciliation-service/src/main/java/com/carddemo/reconciliation/application/ReconciliationService.java`

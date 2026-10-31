@@ -1,51 +1,51 @@
-# ADR-002: 遗留标识符与金额的建模方式
+# ADR-002: Modeling Approach for Legacy Identifiers and Amounts
 
-| 项 | 内容 |
+| Item | Content |
 |----|------|
-| 编号 | ADR-002 |
-| 日期 | 2026-10-25 |
-| 状态 | 已接受 |
-| 关联需求 | 数据字典 `docs/legacy/04-data-dictionary.md` |
+| ID | ADR-002 |
+| Date | 2026-10-25 |
+| Status | Accepted |
+| Related requirements | Data dictionary `docs/legacy/04-data-dictionary.md` |
 
-## 背景
+## Context
 
-遗留系统的业务标识符是定长数字字段且**带前导零**：`ACCT-ID PIC 9(11)`、`CUST-ID PIC 9(9)`、
-`CARD-NUM X(16)`、`TRAN-ID X(16)`。金额为 `S9(10)V99`（定点两位小数）。若用 `long`/`double`
-映射，会丢失 `00000000001` 的前导零、并引入二进制浮点误差。
+Business identifiers in the legacy system are fixed-length numeric fields **with leading zeros**: `ACCT-ID PIC 9(11)`, `CUST-ID PIC 9(9)`,
+`CARD-NUM X(16)`, `TRAN-ID X(16)`. Amounts are `S9(10)V99` (fixed point with two decimals). Mapping them with `long`/`double`
+would lose the leading zeros of `00000000001` and introduce binary floating-point errors.
 
-## 候选方案
+## Alternatives
 
-| 方案 | 描述 | 优点 | 缺点 |
+| Option | Description | Pros | Cons |
 |---|---|---|---|
-| 方案A：零填充字符串 + BigDecimal | 标识符 `String`（DB `VARCHAR(11/9/16)`），金额 `BigDecimal` + `NUMERIC(12,2)` | 与遗留数据一一对应；无精度损失；可直接做字符串比较与 URL 路径 | 索引体积略大；需在入口校验格式 |
-| 方案B：数值类型 + 展示层补零 | `long` + 前端格式化 | DB 索引紧凑；数值比较快 | 前导零在 API/日志/跨服务传递中丢失，易与遗留系统对账失败 |
-| 方案C：UUID 主键 + 遗留号作业务键 | 代理键 UUID | 与遗留解耦 | 增加映射成本；对账与排障时需二次查询；演示项目收益低 |
+| Option A: zero-padded string + BigDecimal | Identifiers as `String` (DB `VARCHAR(11/9/16)`), amounts as `BigDecimal` + `NUMERIC(12,2)` | One-to-one mapping with legacy data; no precision loss; strings can be compared and used directly in URL paths | Slightly larger index footprint; format must be validated at the entry point |
+| Option B: numeric type + zero padding at the presentation layer | `long` + front-end formatting | Compact database indexes; fast numeric comparison | Leading zeros are lost in APIs, logs, and cross-service calls, which easily breaks reconciliation with the legacy system |
+| Option C: UUID primary key + legacy number as business key | Surrogate UUID key | Decoupled from the legacy system | Adds mapping cost; requires a second lookup during reconciliation and troubleshooting; low benefit for a demo project |
 
-## 量化权衡表
+## Quantitative Trade-off Table
 
-| 方案 | 实现成本 | 性能开销 | 运维时效 | 审计性 | 风险 |
+| Option | Implementation cost | Performance overhead | Operational agility | Auditability | Risk |
 |---|---|---|---|---|---|
-| A | 低 | 低（16 字节键，索引差异可忽略） | 即时 | 高（与遗留可逐字段对账） | 低 |
-| B | 低 | 低 | 即时 | 低（对账需补零转换） | 中高（前导零丢失） |
-| C | 中 | 中（多一次映射查询） | 即时 | 中 | 中 |
+| A | Low | Low (16-byte key, index difference is negligible) | Immediate | High (field-by-field reconciliation with legacy is possible) | Low |
+| B | Low | Low | Immediate | Low (reconciliation requires zero-padding conversion) | Medium-high (leading zeros lost) |
+| C | Medium | Medium (one extra mapping lookup) | Immediate | Medium | Medium |
 
-## 决策
+## Decision
 
-采用方案 A。所有业务标识符在领域模型、DTO、数据库、URL 中均为零填充定长字符串；
-金额统一 `BigDecimal`（DB `NUMERIC(12,2)`），服务内不做 `double` 运算。
+Adopt Option A. All business identifiers are zero-padded, fixed-length strings in the domain model, DTOs, database, and URLs;
+amounts uniformly use `BigDecimal` (DB `NUMERIC(12,2)`), and no `double` arithmetic is performed inside services.
 
-## 理由
+## Rationale
 
-1. 双跑期需要按业务号逐条对账（BR-POST/BR-AUTH），前导零丢失会直接导致对账失败。
-2. 卡号 16 位超出 `int` 范围、且在遗留系统中是非数值语义（可能含非数字字符的历史数据）。
-3. 利息计算 `TRAN-CAT-BAL × 利率 ÷ 1200` 必须定点舍入（`HALF_UP`，scale 2），`double` 不可接受。
+1. The parallel-run period requires item-by-item reconciliation by business number (BR-POST/BR-AUTH); losing leading zeros would directly cause reconciliation failures.
+2. A 16-digit card number exceeds the `int` range and is non-numeric by nature in the legacy system (historical data may contain non-digit characters).
+3. Interest calculation `TRAN-CAT-BAL × rate ÷ 1200` must use fixed-point rounding (`HALF_UP`, scale 2); `double` is unacceptable.
 
-## 后果（影响与回退路径）
+## Consequences (Impact and Rollback Path)
 
-- 影响：所有查询参数为字符串；入口统一 `@Pattern` 校验（11/9/16 位）。
-- 回退：若后续需要数值代理键，可在保持业务键唯一约束的前提下增加 `id BIGSERIAL`，API 不变。
+- Impact: all query parameters are strings; `@Pattern` validation is applied uniformly at the entry point (11/9/16 digits).
+- Rollback: if a numeric surrogate key is needed later, add `id BIGSERIAL` while keeping the unique constraint on the business key; the API stays unchanged.
 
-## 证据
+## Evidence
 
-- `CVACT01Y.cpy:5`、`CVCUS01Y.cpy:5`、`CVACT02Y.cpy:5`、`CVTRA05Y.cpy:5`
-- `docs/legacy/04-data-dictionary.md` 标识符规则
+- `CVACT01Y.cpy:5`, `CVCUS01Y.cpy:5`, `CVACT02Y.cpy:5`, `CVTRA05Y.cpy:5`
+- `docs/legacy/04-data-dictionary.md` identifier rules

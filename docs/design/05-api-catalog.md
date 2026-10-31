@@ -1,17 +1,17 @@
-# API 目录（服务间契约）
+# API Catalog (Service-to-Service Contracts)
 
-> 所有服务遵循 `docs/design/07-java-conventions.md`。基础路径 `/api/v1`，JSON，UTF-8。
-> 面向业务人员的界面：`http://localhost:8090/`（web-ui 托管 SPA 并同源代理全部 `/api/**`）。
-> 每个服务提供 Swagger UI（根路径自动跳转）：`http://localhost:8081/` … `http://localhost:8087/`，
-> 登录请求体已预填 `ADMIN001/admin123`；OpenAPI 描述位于 `/v3/api-docs`。
-> 列表响应统一 `{"items": [...], "page": 0, "size": 10, "total": 42}`。
-> 错误响应统一 `{"code": "...", "message": "...", "details": [...]}`，HTTP 语义见规范 §4。
+> All services follow `docs/design/07-java-conventions.md`. Base path `/api/v1`, JSON, UTF-8.
+> Business-facing UI: `http://localhost:8090/` (web-ui hosts the SPA and same-origin proxies all `/api/**`).
+> Each service provides Swagger UI (the root path redirects automatically): `http://localhost:8081/` … `http://localhost:8087/`;
+> the login request body is pre-filled with `ADMIN001/admin123`; the OpenAPI description lives at `/v3/api-docs`.
+> List responses uniformly return `{"items": [...], "page": 0, "size": 10, "total": 42}`.
+> Error responses uniformly return `{"code": "...", "message": "...", "details": [...]}`; HTTP semantics are in the conventions §4.
 
-## 0. 种子数据契约（初始 6 个服务必须一致）
+## 0. Seed Data Contract (must be identical across the initial 6 services)
 
-### 客户（customer-service）
+### Customers (customer-service)
 
-| customerId | 姓 / 名 | 城市(addressLine3) | 州 | 邮编 | FICO | 主卡 |
+| customerId | Last / first name | City (addressLine3) | State | ZIP | FICO | Primary card |
 |---|---|---|---|---|---|---|
 | 000000001 | Kessler / Immanuel | Altenwerthshire | NY | 10001 | 720 | Y |
 | 000000002 | Rosenbaum / Enrico | West Bernita | CA | 90002 | 680 | N |
@@ -22,9 +22,9 @@
 | 000000007 | Whitfield / Daniel | Denver | CO | 80202 | 590 | N |
 | 000000008 | Bennett / Aisha | Chicago | IL | 60601 | 765 | N |
 
-### 卡片（card-service）
+### Cards (card-service)
 
-| cardNumber | accountId | customerId | 到期日 | 状态 | 卡面名 |
+| cardNumber | accountId | customerId | Expiry date | Status | Embossed name |
 |---|---|---|---|---|---|
 | 0500024453765740 | 00000000001 | 000000001 | 2028-05-20 | Y | IMMANUEL KESSLER |
 | 6677889900112233 | 00000000001 | 000000001 | 2029-01-01 | Y | IMANUEL KESSLER |
@@ -36,18 +36,18 @@
 | 4455667788990011 | 00000000007 | 000000007 | 2024-05-05 | N | DANIEL WHITFIELD |
 | 5566778899001122 | 00000000008 | 000000008 | 2030-09-30 | Y | AISHA BENNETT |
 
-### 用户（iam-service）
+### Users (iam-service)
 
-| userId | 密码（明文，仅种子） | 类型 | 名 / 姓 |
+| userId | Password (plaintext, seed only) | Type | First / last name |
 |---|---|---|---|
 | ADMIN001 | admin123 | A | System / Administrator |
 | USER0001 | user1234 | U | Demo / User |
 
-密码以 PBKDF2 哈希存入 Flyway 种子脚本（不得明文入库）。
+Passwords are stored as PBKDF2 hashes in the Flyway seed scripts (never in plaintext in the database).
 
-### 交易参照数据（transaction-service）
+### Transaction Reference Data (transaction-service)
 
-| 类型码 | 描述 | 类别码（类型内） | 类别描述 | 利率（组 A000000000 / DEFAULT） |
+| Type code | Description | Category code (within type) | Category description | Rate (group A000000000 / DEFAULT) |
 |---|---|---|---|---|
 | 01 | Purchase | 0001 | Regular Sales Draft | 18.00 / 20.00 |
 | 01 | Purchase | 0002 | Regular Cash Advance | 24.00 / 20.00 |
@@ -61,13 +61,13 @@
 | 06 | Reversal | 0001 | Reversal | 0.00 / 0.00 |
 | 07 | Adjustment | 0001 | Adjustment | 0.00 / 0.00 |
 
-类别累计（`tran_category_balance`）种子：账户 1/01/0001 = 1200.00；账户 1/01/0002 = 500.00；
-账户 2/01/0001 = 800.00；账户 3/01/0001 = 400.00；账户 4/01/0001 = 300.50；
-账户 6/01/0001 = 1500.00；账户 8/01/0001 = 2000.00。
+Category accumulation (`tran_category_balance`) seed: account 1/01/0001 = 1200.00; account 1/01/0002 = 500.00;
+account 2/01/0001 = 800.00; account 3/01/0001 = 400.00; account 4/01/0001 = 300.50;
+account 6/01/0001 = 1500.00; account 8/01/0001 = 2000.00.
 
-交易种子（`transaction`，按交易号升序）：
+Transaction seed (`transaction`, ascending by transaction number):
 
-| 交易号 | 账户 | 卡号 | 类型/类别 | 金额 | 描述 | 处理时间 |
+| Transaction ID | Account | Card number | Type/category | Amount | Description | Processed timestamp |
 |---|---|---|---|---|---|---|
 | 0000000000000001 | 00000000001 | 0500024453765740 | 01/0001 | 50.47 | Purchase at Abshire-Lowe | 2026-09-15T10:00:00 |
 | 0000000000000002 | 00000000002 | 0683586198171516 | 01/0001 | 91.90 | Return item at Nitzsche | 2026-09-16T11:30:00 |
@@ -78,7 +78,7 @@
 
 ---
 
-## 1. iam-service（:8081）
+## 1. iam-service (:8081)
 
 ### POST /api/v1/auth/login
 
@@ -86,7 +86,7 @@
 {"userId": "ADMIN001", "password": "admin123"}
 ```
 
-`200`：
+`200`:
 
 ```json
 {
@@ -97,9 +97,9 @@
 }
 ```
 
-- 用户号/密码统一 `trim` + 用户号大写；密码不做大小写转换（ADR-008）。
-- 失败统一 `401 INVALID_CREDENTIALS`（不区分用户不存在/密码错误）。
-- 缺参 `400 VALIDATION_FAILED`。
+- User ID/password are both `trim`med and the user ID is upper-cased; the password is not case-normalized (ADR-008).
+- Failures uniformly return `401 INVALID_CREDENTIALS` (no distinction between an unknown user and a wrong password).
+- Missing parameters → `400 VALIDATION_FAILED`.
 
 ### POST /api/v1/auth/verify
 
@@ -107,18 +107,18 @@
 {"token": "..."}
 ```
 
-`200`：`{"valid": true, "userId": "ADMIN001", "userType": "A", "expiresAt": "..."}`
-`200`（无效/过期）：`{"valid": false}` — 不返回 401（供网关判定）。
+`200`: `{"valid": true, "userId": "ADMIN001", "userType": "A", "expiresAt": "..."}`
+`200` (invalid/expired): `{"valid": false}` — does not return 401 (so the gateway can decide).
 
 ### GET /api/v1/users?page=0&size=10
 
-`200`：`{"items": [UserResponse...], "page": 0, "size": 10, "total": 2}`
+`200`: `{"items": [UserResponse...], "page": 0, "size": 10, "total": 2}`
 
-`UserResponse`：`{"userId","firstName","lastName","userType","version"}`（**不含密码/哈希**）。
+`UserResponse`: `{"userId","firstName","lastName","userType","version"}` (**does not include the password/hash**).
 
 ### GET /api/v1/users/{userId}
 
-`200` UserResponse；`404 USER_NOT_FOUND`。
+`200` UserResponse; `404 USER_NOT_FOUND`.
 
 ### POST /api/v1/users
 
@@ -127,8 +127,8 @@
  "password": "pass1234", "userType": "U"}
 ```
 
-`201` UserResponse；`409 USER_ALREADY_EXISTS`；`400 VALIDATION_FAILED`（用户号 `^[A-Z0-9]{8}$`、
-姓/名 1–20、密码 8–64、类型 `[AU]`）。
+`201` UserResponse; `409 USER_ALREADY_EXISTS`; `400 VALIDATION_FAILED` (user ID `^[A-Z0-9]{8}$`,
+last/first name 1–20, password 8–64, type `[AU]`).
 
 ### PUT /api/v1/users/{userId}
 
@@ -136,22 +136,22 @@
 {"firstName": "Ada", "lastName": "Lovelace", "userType": "U", "password": "newpass1"}
 ```
 
-`password` 可省略（保持不变）。`200`；`404`；`409 LAST_ADMIN`（将唯一管理员降级为 U）。
+`password` may be omitted (left unchanged). `200`; `404`; `409 LAST_ADMIN` (demoting the only administrator to U).
 
 ### DELETE /api/v1/users/{userId}
 
-可选请求头 `X-User-Id`。`204`；`404`；`409 LAST_ADMIN`；`409 CANNOT_DELETE_SELF`
-（`X-User-Id` 与目标相同）。
+Optional request header `X-User-Id`. `204`; `404`; `409 LAST_ADMIN`; `409 CANNOT_DELETE_SELF`
+(`X-User-Id` equals the target).
 
 ---
 
-## 2. customer-service（:8082）
+## 2. customer-service (:8082)
 
 ### GET /api/v1/customers?page=0&size=10
 
-`200`：`{"items": [CustomerResponse...], "page": 0, "size": 10, "total": 8}`
+`200`: `{"items": [CustomerResponse...], "page": 0, "size": 10, "total": 8}`
 
-`CustomerResponse`：
+`CustomerResponse`:
 
 ```json
 {
@@ -169,7 +169,7 @@
 
 ### GET /api/v1/customers/{customerId}
 
-`200`；`404 CUSTOMER_NOT_FOUND`。
+`200`; `404 CUSTOMER_NOT_FOUND`.
 
 ### POST /api/v1/customers
 
@@ -184,35 +184,35 @@
 }
 ```
 
-`201`；`409 CUSTOMER_ALREADY_EXISTS`。`ssn` 只入不出。
+`201`; `409 CUSTOMER_ALREADY_EXISTS`. `ssn` is write-only.
 
 ### PUT /api/v1/customers/{customerId}
 
-同 POST 的字段（`customerId` 来自路径，`ssn` 可选：省略表示不变）。`200`；`404`；`409`。
+Same fields as POST (`customerId` comes from the path; `ssn` is optional and omission means unchanged). `200`; `404`; `409`.
 
-### 校验错误码
+### Validation Error Codes
 
-`400 VALIDATION_FAILED`，`details` 保留遗留文案，例如 `stateCode: State: is not a valid state code`。
+`400 VALIDATION_FAILED`; `details` preserves the legacy message, for example `stateCode: State: is not a valid state code`.
 
 ---
 
-## 3. card-service（:8083）
+## 3. card-service (:8083)
 
 ### GET /api/v1/cards?accountId=00000000001&customerId=&page=0&size=7
 
-过滤条件均可选；`accountId` 11 位、`customerId` 9 位。
-`200`：`{"items": [CardResponse...], "page": 0, "size": 7, "total": 2}`
+All filters are optional; `accountId` is 11 digits and `customerId` is 9 digits.
+`200`: `{"items": [CardResponse...], "page": 0, "size": 7, "total": 2}`
 
-`CardResponse`：`{"cardNumber","accountId","customerId","embossedName","expiryDate","activeStatus","version"}`
-（**不返回 CVV**）。
+`CardResponse`: `{"cardNumber","accountId","customerId","embossedName","expiryDate","activeStatus","version"}`
+(**does not return the CVV**).
 
 ### GET /api/v1/cards/{cardNumber}
 
-`200` CardResponse；`404 CARD_NOT_FOUND`。
+`200` CardResponse; `404 CARD_NOT_FOUND`.
 
 ### GET /api/v1/cards/by-account/{accountId}
 
-`200`：`{"items": [CardResponse...]}`（不分页，供内部调用与账户视图组合）。
+`200`: `{"items": [CardResponse...]}` (not paginated; used for internal calls and to compose the account view).
 
 ### POST /api/v1/cards
 
@@ -221,7 +221,7 @@
  "cvv":"123","embossedName":"ENRICO ROSENBAUM","expiryDate":"2029-08-11","activeStatus":"Y"}
 ```
 
-`201`；`409 CARD_ALREADY_EXISTS`；`409 ACCOUNT_CUSTOMER_MISMATCH`（同一账户已存在的卡客户号不一致）。
+`201`; `409 CARD_ALREADY_EXISTS`; `409 ACCOUNT_CUSTOMER_MISMATCH` (the customer number differs from cards that already exist on the same account).
 
 ### PUT /api/v1/cards/{cardNumber}
 
@@ -230,20 +230,20 @@
  "expiryMonth": 8, "expiryYear": 2029}
 ```
 
-`200`；`404`；`409 CONCURRENT_UPDATE`；`400 VALIDATION_FAILED`（卡名仅字母空格且必填、
-状态 `[YN]`、月 1–12、年 1950–2099）。**CVV 不可修改**。
+`200`; `404`; `409 CONCURRENT_UPDATE`; `400 VALIDATION_FAILED` (embossed name required and letters/spaces only,
+status `[YN]`, month 1–12, year 1950–2099). **The CVV cannot be modified**.
 
 ---
 
-## 4. account-service（:8084）
+## 4. account-service (:8084)
 
 ### GET /api/v1/accounts
 
-`200`：`{"items": [AccountResponse...]}`（8 条种子）。
+`200`: `{"items": [AccountResponse...]}` (8 seed records).
 
 ### GET /api/v1/accounts/{accountId}
 
-`200` AccountResponse；`404 ACCOUNT_NOT_FOUND`。
+`200` AccountResponse; `404 ACCOUNT_NOT_FOUND`.
 
 ### PUT /api/v1/accounts/{accountId}
 
@@ -257,7 +257,7 @@
 }
 ```
 
-`200`；`404`；`400 VALIDATION_FAILED`；`409 CONCURRENT_UPDATE`。
+`200`; `404`; `400 VALIDATION_FAILED`; `409 CONCURRENT_UPDATE`.
 
 ### POST /api/v1/accounts/{accountId}/postings
 
@@ -265,8 +265,8 @@
 {"amount": 125.40}
 ```
 
-`200` AccountResponse；`404`。语义：`currentBalance += amount`；`amount ≥ 0` 计入 `currentCycleCredit`，
-否则计入 `currentCycleDebit`（BR-ACCT-09）。
+`200` AccountResponse; `404`. Semantics: `currentBalance += amount`; `amount ≥ 0` is counted in `currentCycleCredit`,
+otherwise in `currentCycleDebit` (BR-ACCT-09).
 
 ### POST /api/v1/accounts/{accountId}/payments
 
@@ -274,7 +274,7 @@
 {"amount": 1940.00}
 ```
 
-`200`；`404`；`409 NOTHING_TO_PAY`（余额 ≤ 0）；`409 PAYMENT_EXCEEDS_BALANCE`；`409 INVALID_PAYMENT_AMOUNT`。
+`200`; `404`; `409 NOTHING_TO_PAY` (balance ≤ 0); `409 PAYMENT_EXCEEDS_BALANCE`; `409 INVALID_PAYMENT_AMOUNT`.
 
 ### POST /api/v1/accounts/{accountId}/interest-accruals
 
@@ -282,17 +282,17 @@
 {"amount": 25.50}
 ```
 
-`200`；`404`。语义：`currentBalance += amount`，`currentCycleCredit = currentCycleDebit = 0`。
+`200`; `404`. Semantics: `currentBalance += amount`, `currentCycleCredit = currentCycleDebit = 0`.
 
 ---
 
-## 5. transaction-service（:8085）
+## 5. transaction-service (:8085)
 
 ### GET /api/v1/transactions?idPrefix=&cardNumber=&accountId=&page=0&size=10
 
-`200`：`{"items": [TransactionResponse...], "page": 0, "size": 10, "total": 6}`，按 `transactionId` 升序。
+`200`: `{"items": [TransactionResponse...], "page": 0, "size": 10, "total": 6}`, sorted ascending by `transactionId`.
 
-`TransactionResponse`：
+`TransactionResponse`:
 
 ```json
 {
@@ -311,7 +311,7 @@
 
 ### GET /api/v1/transactions/{transactionId}
 
-`200`；`404 TRANSACTION_NOT_FOUND`。
+`200`; `404 TRANSACTION_NOT_FOUND`.
 
 ### POST /api/v1/transactions
 
@@ -333,9 +333,9 @@
 }
 ```
 
-`201` TransactionResponse（`transactionId = max + 1`，16 位）；
-`400 ACCOUNT_OR_CARD_REQUIRED`、`400 CARD_ACCOUNT_MISMATCH`、`400 VALIDATION_FAILED`、
-`404 CARD_NOT_FOUND`（卡号路径）、`404 ACCOUNT_NOT_FOUND`、`409 DUPLICATE_TRANSACTION_ID`。
+`201` TransactionResponse (`transactionId = max + 1`, 16 digits);
+`400 ACCOUNT_OR_CARD_REQUIRED`, `400 CARD_ACCOUNT_MISMATCH`, `400 VALIDATION_FAILED`,
+`404 CARD_NOT_FOUND` (card number path), `404 ACCOUNT_NOT_FOUND`, `409 DUPLICATE_TRANSACTION_ID`.
 
 ### POST /api/v1/postings
 
@@ -355,7 +355,7 @@
 }
 ```
 
-`200`：
+`200`:
 
 ```json
 {
@@ -367,11 +367,11 @@
 }
 ```
 
-`duplicates` 列出重复提交且未重复记账的交易号（NR-POST-01）。
+`duplicates` lists transaction IDs that were submitted again and not posted twice (NR-POST-01).
 
-规则：卡不存在 → 100；账户不存在 → 101；`creditLimit < cycleCredit − cycleDebit + amount` → 102；
-`account.expirationDate < originalTimestamp.date` → 103；通过则更新类别累计、调账户记账、写交易。
-同一 `transactionId` 重复提交 → 计入 `posted` 并标记 `duplicate=true`（幂等，不重复记账）。
+Rules: card not found → 100; account not found → 101; `creditLimit < cycleCredit − cycleDebit + amount` → 102;
+`account.expirationDate < originalTimestamp.date` → 103; if it passes, update the category accumulation, call account posting and write the transaction.
+A repeated submission with the same `transactionId` → counted in `posted` and marked `duplicate=true` (idempotent, not posted twice).
 
 ### POST /api/v1/interest-runs
 
@@ -379,17 +379,17 @@
 {"statementDate": "2026-10-25"}
 ```
 
-`200`：
+`200`:
 
 ```json
 {"statementDate": "2026-10-25", "accountsProcessed": 7, "interestPosted": 3,
  "totalInterest": 45.50, "details": [{"accountId": "00000000001", "interestAmount": 25.50}]}
 ```
 
-规则：对 `tran_category_balance` 按账户分组；每个 `(账户,类型,类别)` 查披露组利率（缺失回退 `DEFAULT`），
-`interest = balance × rate ÷ 1200`（HALF_UP，2 位）；按账户汇总后生成一笔交易（类型 01、类别 0005、
-来源 `System`、描述 `Int. for a/c <accountId>`、卡号取该账户第一张卡），并调
-`POST /accounts/{id}/interest-accruals`；交易号 = `yyyyMMdd` + 8 位序号。
+Rules: group `tran_category_balance` by account; for each `(account, type, category)` look up the disclosure-group rate (falling back to `DEFAULT` when missing),
+`interest = balance × rate ÷ 1200` (HALF_UP, 2 decimals); after summing per account, generate one transaction (type 01, category 0005,
+source `System`, description `Int. for a/c <accountId>`, card number taken from the account's first card) and call
+`POST /accounts/{id}/interest-accruals`; the transaction ID = `yyyyMMdd` + an 8-digit sequence.
 
 ### POST /api/v1/bill-payments
 
@@ -397,13 +397,13 @@
 {"accountId": "00000000001", "confirm": true}
 ```
 
-`200`：`{"transactionId": "0000000000000200", "amount": 1940.00, "newBalance": 0.00}`
-`409 CONFIRMATION_REQUIRED`（`confirm=false`）；`409 NOTHING_TO_PAY`；`404 ACCOUNT_NOT_FOUND`；
-`503 DEPENDENCY_UNAVAILABLE`。
+`200`: `{"transactionId": "0000000000000200", "amount": 1940.00, "newBalance": 0.00}`
+`409 CONFIRMATION_REQUIRED` (`confirm=false`); `409 NOTHING_TO_PAY`; `404 ACCOUNT_NOT_FOUND`;
+`503 DEPENDENCY_UNAVAILABLE`.
 
 ### GET /api/v1/reports/transactions?startDate=2026-09-01&endDate=2026-09-30&cardNumber=&page=0&size=50
 
-`200`：
+`200`:
 
 ```json
 {
@@ -415,16 +415,16 @@
 }
 ```
 
-过滤：`processedTimestamp.date` 闭区间；可选 `cardNumber`。合计口径：`pageTotal` = 当前返回项之和；
-`grandTotal` = 过滤范围内全部项之和；`accountTotals` = 按卡号分组（BR-RPT-02/03）。
+Filter: `processedTimestamp.date` inclusive range; optional `cardNumber`. Totals semantics: `pageTotal` = sum of the currently returned items;
+`grandTotal` = sum of all items in the filter range; `accountTotals` = grouped by card number (BR-RPT-02/03).
 
 ### GET /api/v1/transaction-types
 
-`200`：`{"items": [{"typeCode": "01", "description": "Purchase"}...]}`
+`200`: `{"items": [{"typeCode": "01", "description": "Purchase"}...]}`
 
 ### GET /api/v1/transaction-categories?typeCode=
 
-`200`：`{"items": [{"typeCode": "01", "categoryCode": "0001", "description": "Regular Sales Draft"}...]}`
+`200`: `{"items": [{"typeCode": "01", "categoryCode": "0001", "description": "Regular Sales Draft"}...]}`
 
 ### PUT /api/v1/transaction-types/{typeCode}
 
@@ -432,11 +432,11 @@
 {"description": "Purchase"}
 ```
 
-`200`；`404 TRANSACTION_TYPE_NOT_FOUND`。
+`200`; `404 TRANSACTION_TYPE_NOT_FOUND`.
 
 ---
 
-## 6. authorization-service（:8086）
+## 6. authorization-service (:8086)
 
 ### POST /api/v1/authorizations
 
@@ -462,9 +462,9 @@
 }
 ```
 
-除 `cardNumber`、`transactionAmount` 外均可选；`authTimestamp` 缺省为服务端当前时间。
+Everything except `cardNumber` and `transactionAmount` is optional; `authTimestamp` defaults to the server's current time.
 
-`201`：
+`201`:
 
 ```json
 {
@@ -481,12 +481,12 @@
 }
 ```
 
-拒绝时 `responseCode=05`、`approvedAmount=0`、`reasonCode ∈ {3100,4100,4200,4300,5100,9000}`。
-下游不可用 → `503 DEPENDENCY_UNAVAILABLE`（失败关闭，不批准）。
+On decline `responseCode=05`, `approvedAmount=0`, `reasonCode ∈ {3100,4100,4200,4300,5100,9000}`.
+Downstream unavailable → `503 DEPENDENCY_UNAVAILABLE` (fail closed, no approval).
 
 ### GET /api/v1/pending-authorizations/{accountId}
 
-`200`：
+`200`:
 
 ```json
 {"accountId": "00000000001", "creditLimit": 2020.00, "cashLimit": 1020.00,
@@ -495,25 +495,25 @@
  "declinedCount": 0, "declinedAmount": 0.00}
 ```
 
-无汇总记录时返回 `404 AUTHORIZATION_SUMMARY_NOT_FOUND`。
-可用额度口径（NR-AUTH-03）：`creditLimit − 账户当前余额 − creditBalance`。
+When there is no summary record, `404 AUTHORIZATION_SUMMARY_NOT_FOUND` is returned.
+Available credit semantics (NR-AUTH-03): `creditLimit − the account's current balance − creditBalance`.
 
 ### GET /api/v1/authorizations?accountId=00000000001&page=0&size=10
 
-`200`：`{"items": [AuthorizationSummary...], "page": 0, "size": 10, "total": 1}`，
-按 `authTimestamp` 倒序。
+`200`: `{"items": [AuthorizationSummary...], "page": 0, "size": 10, "total": 1}`,
+sorted descending by `authTimestamp`.
 
-`AuthorizationSummary`：`{"authorizationId","cardNumber","authTimestamp","transactionId",
+`AuthorizationSummary`: `{"authorizationId","cardNumber","authTimestamp","transactionId",
 "transactionAmount","responseCode","reasonCode","approvedAmount","merchantName","fraudFlag"}`
 
 ### GET /api/v1/authorizations/{authorizationId}
 
-`200` 完整明细（含请求字段与 `accountId/customerId/merchant*`）；`404 AUTHORIZATION_NOT_FOUND`。
+`200` full detail (including the request fields and `accountId/customerId/merchant*`); `404 AUTHORIZATION_NOT_FOUND`.
 
 ### POST /api/v1/authorizations/{authorizationId}/fraud
 
-`200`：`{"authorizationId":"...","fraudFlag":"Y","cardNumber":"...","cardBlocked":true}`
-`404`；重复标记幂等。
+`200`: `{"authorizationId":"...","fraudFlag":"Y","cardNumber":"...","cardBlocked":true}`
+`404`; repeated flags are idempotent.
 
 ### POST /api/v1/authorization-purges
 
@@ -521,51 +521,51 @@
 {"expiryDays": 5}
 ```
 
-`200`：
+`200`:
 
 ```json
 {"summariesRead": 3, "summariesDeleted": 1, "detailsRead": 5, "detailsDeleted": 4,
  "creditBalanceReleased": 120.00}
 ```
 
-规则：`authTimestamp` 早于 `now − expiryDays`（缺省 5）的明细删除；删除批准的明细时
-`creditBalance -= approvedAmount`（NR-AUTH-01）；汇总按剩余明细重算，批准与拒绝笔数均为 0 时删除汇总
-（NR-AUTH-02）。
+Rules: details whose `authTimestamp` is earlier than `now − expiryDays` (default 5) are deleted; when an approved detail is deleted,
+`creditBalance -= approvedAmount` (NR-AUTH-01); the summary is recomputed from the remaining details, and when both the approved and declined counts are 0 the summary is deleted
+(NR-AUTH-02).
 
 ---
 
-## 7. 资金、风险与运营 API
+## 7. Funds, Risk and Operations APIs
 
-### 7.1 account-service 账户产品与资金冻结（A1.1）
+### 7.1 account-service Account Products and Fund Holds (A1.1)
 
-| 方法 | 路径 | 说明 |
+| Method | Path | Description |
 |---|---|---|
-| GET | `/api/v1/account-products` | 产品列表（含额度上限、APR、月费、账单日） |
-| GET | `/api/v1/account-products/{productCode}` | 产品详情 |
-| GET | `/api/v1/accounts/{accountId}/credit-position` | 额度、余额、冻结、可用额度 |
-| GET | `/api/v1/accounts/{accountId}/holds?status=ACTIVE` | 冻结列表，`status` 可选 |
-| POST | `/api/v1/accounts/{accountId}/holds` | 创建冻结，`referenceId` 幂等 |
-| DELETE | `/api/v1/accounts/{accountId}/holds/{holdId}` | 释放冻结，重复释放幂等 |
+| GET | `/api/v1/account-products` | Product list (including maximum limit, APR, monthly fee, statement day) |
+| GET | `/api/v1/account-products/{productCode}` | Product detail |
+| GET | `/api/v1/accounts/{accountId}/credit-position` | Limit, balance, holds, available credit |
+| GET | `/api/v1/accounts/{accountId}/holds?status=ACTIVE` | Hold list; `status` is optional |
+| POST | `/api/v1/accounts/{accountId}/holds` | Create a hold; `referenceId` is idempotent |
+| DELETE | `/api/v1/accounts/{accountId}/holds/{holdId}` | Release a hold; repeated releases are idempotent |
 
-创建冻结请求：
+Create hold request:
 
 ```json
 {"amount": 100.00, "referenceType": "AUTHORIZATION", "referenceId": "auth-20261026-0001", "expiresAt": "2026-10-26T12:00:00"}
 ```
 
-可用额度 = `creditLimit - currentBalance - Σ(ACTIVE 且未过期的 hold)`。
-账户响应新增 `productCode`；账户更新时额度不得超过产品上限。
+Available credit = `creditLimit - currentBalance - Σ(ACTIVE and non-expired holds)`.
+Account responses gain a `productCode`; on account update the limit must not exceed the product maximum.
 
-### 7.2 transaction-service 过账引擎（A1.2）
+### 7.2 transaction-service Posting Engine (A1.2)
 
-| 方法 | 路径 | 说明 |
+| Method | Path | Description |
 |---|---|---|
-| GET | `/api/v1/posting-types` | 过账类型列表 |
-| GET | `/api/v1/posting-types/{typeCode}` | 类型详情 + 借贷规则 |
-| POST | `/api/v1/posting-batches` | 创建过账批次（201，`idempotencyKey` 幂等） |
-| GET | `/api/v1/posting-batches/{batchId}` | 批次详情（含 legs） |
-| GET | `/api/v1/posting-batches?page=&size=&accountId=&idempotencyKey=` | 分页查询 |
-| POST | `/api/v1/posting-batches/{batchId}/reversal` | 冲正，返回冲正批次 |
+| GET | `/api/v1/posting-types` | Posting type list |
+| GET | `/api/v1/posting-types/{typeCode}` | Type detail + debit/credit rules |
+| POST | `/api/v1/posting-batches` | Create a posting batch (201, `idempotencyKey` idempotent) |
+| GET | `/api/v1/posting-batches/{batchId}` | Batch detail (including legs) |
+| GET | `/api/v1/posting-batches?page=&size=&accountId=&idempotencyKey=` | Paginated query |
+| POST | `/api/v1/posting-batches/{batchId}/reversal` | Reversal; returns the reversal batch |
 
 ```json
 {"idempotencyKey":"post-20261026-0001","typeCode":"CARD_PURCHASE",
@@ -573,22 +573,22 @@
  "description":"Purchase at Corner Grocery"}
 ```
 
-类型：`CARD_PURCHASE`、`CASH_ADVANCE`、`FEE`、`INTEREST`（INCREASE）；`PAYMENT`、`REFUND`（DECREASE）；
-`ADJUSTMENT`（INCREASE）。批次生成 2 条 leg，借贷必须平衡；`reversal:<batchId>` 为冲正批次幂等键。
+Types: `CARD_PURCHASE`, `CASH_ADVANCE`, `FEE`, `INTEREST` (INCREASE); `PAYMENT`, `REFUND` (DECREASE);
+`ADJUSTMENT` (INCREASE). A batch generates 2 legs and debits must balance credits; `reversal:<batchId>` is the idempotency key of the reversal batch.
 
-### 7.3 ledger-service 总账（A1.3）
+### 7.3 ledger-service General Ledger (A1.3)
 
-| 方法 | 路径 | 说明 |
+| Method | Path | Description |
 |---|---|---|
-| GET | `/api/v1/ledger-accounts` | 科目表 |
-| GET | `/api/v1/ledger-accounts/{code}` | 科目详情 |
-| POST | `/api/v1/journal-entries` | 记日记账（201，`(sourceType, sourceId)` 幂等） |
-| GET | `/api/v1/journal-entries/{entryId}` | 分录详情 |
-| GET | `/api/v1/journal-entries?page=&size=&sourceId=` | 分页查询 |
-| POST | `/api/v1/journal-entries/{entryId}/reversal` | 冲正（201） |
-| GET | `/api/v1/trial-balance?period=YYYY-MM` | 试算平衡 |
-| GET | `/api/v1/accounting-periods` | 期间列表 |
-| POST | `/api/v1/accounting-periods/{period}/close` | 关账 |
+| GET | `/api/v1/ledger-accounts` | Chart of accounts |
+| GET | `/api/v1/ledger-accounts/{code}` | Account detail |
+| POST | `/api/v1/journal-entries` | Record a journal entry (201, `(sourceType, sourceId)` idempotent) |
+| GET | `/api/v1/journal-entries/{entryId}` | Entry detail |
+| GET | `/api/v1/journal-entries?page=&size=&sourceId=` | Paginated query |
+| POST | `/api/v1/journal-entries/{entryId}/reversal` | Reversal (201) |
+| GET | `/api/v1/trial-balance?period=YYYY-MM` | Trial balance |
+| GET | `/api/v1/accounting-periods` | Period list |
+| POST | `/api/v1/accounting-periods/{period}/close` | Close period |
 
 ```json
 {"sourceType":"POSTING_BATCH","sourceId":"b-1","description":"Card purchase",
@@ -597,38 +597,38 @@
           {"accountCode":"2100","direction":"CR","amount":25.00}]}
 ```
 
-种子科目：1000/1100/2000/2100/2200/4000/4100/5000/9000；种子期间：2026-09 CLOSED、2026-10/11 OPEN。
+Seed accounts: 1000/1100/2000/2100/2200/4000/4100/5000/9000; seed periods: 2026-09 CLOSED, 2026-10/11 OPEN.
 
-### 7.4 reconciliation-service 对账与 EOD（A1.4）
+### 7.4 reconciliation-service Reconciliation and EOD (A1.4)
 
-| 方法 | 路径 | 说明 |
+| Method | Path | Description |
 |---|---|---|
-| POST | `/api/v1/reconciliation-runs` | 按 `businessDate` 执行对账（201） |
-| GET | `/api/v1/reconciliation-runs/{runId}` | 运行详情 + items |
-| GET | `/api/v1/reconciliation-runs?page=&size=` | 运行历史 |
-| GET | `/api/v1/reconciliation-runs/{runId}/items` | 差异明细 |
-| POST | `/api/v1/reconciliation-items/{itemId}/resolve` | 登记差异处理说明 |
-| POST | `/api/v1/eod-runs` | 执行 EOD（当前步骤：对账，201） |
-| GET | `/api/v1/eod-runs/{runId}` | EOD 详情 |
-| GET | `/api/v1/eod-runs?page=&size=` | EOD 历史 |
+| POST | `/api/v1/reconciliation-runs` | Run reconciliation for a `businessDate` (201) |
+| GET | `/api/v1/reconciliation-runs/{runId}` | Run detail + items |
+| GET | `/api/v1/reconciliation-runs?page=&size=` | Run history |
+| GET | `/api/v1/reconciliation-runs/{runId}/items` | Discrepancy details |
+| POST | `/api/v1/reconciliation-items/{itemId}/resolve` | Record a discrepancy resolution note |
+| POST | `/api/v1/eod-runs` | Run EOD (current step: reconciliation, 201) |
+| GET | `/api/v1/eod-runs/{runId}` | EOD detail |
+| GET | `/api/v1/eod-runs?page=&size=` | EOD history |
 
 ```json
 {"businessDate":"2026-10-26"}
 ```
 
-匹配键：`posting_batch.batch_id` ↔ `journal_entry.source_id`（`sourceType=POSTING_BATCH`）；
-差异状态：`MATCH`、`MISSING_JOURNAL`、`MISSING_BATCH`、`AMOUNT_MISMATCH`、`UNBALANCED`。
+Match key: `posting_batch.batch_id` ↔ `journal_entry.source_id` (`sourceType=POSTING_BATCH`);
+discrepancy statuses: `MATCH`, `MISSING_JOURNAL`, `MISSING_BATCH`, `AMOUNT_MISMATCH`, `UNBALANCED`.
 
-### 7.5 payment-service 支付（P2）
+### 7.5 payment-service Payments (P2)
 
-| 方法 | 路径 | 说明 |
+| Method | Path | Description |
 |---|---|---|
-| POST | `/api/v1/payment-orders` | 受理支付（201，`idempotencyKey` 幂等） |
-| GET | `/api/v1/payment-orders/{paymentId}` | 详情 |
-| GET | `/api/v1/payment-orders?page=&size=&status=&accountId=` | 分页 |
-| POST | `/api/v1/payment-orders/{paymentId}/accept` | 接受 |
-| POST | `/api/v1/payment-orders/{paymentId}/settle` | 清算（过账） |
-| POST | `/api/v1/payment-orders/{paymentId}/return` | 退汇 |
+| POST | `/api/v1/payment-orders` | Accept a payment (201, `idempotencyKey` idempotent) |
+| GET | `/api/v1/payment-orders/{paymentId}` | Detail |
+| GET | `/api/v1/payment-orders?page=&size=&status=&accountId=` | Pagination |
+| POST | `/api/v1/payment-orders/{paymentId}/accept` | Accept |
+| POST | `/api/v1/payment-orders/{paymentId}/settle` | Settle (posting) |
+| POST | `/api/v1/payment-orders/{paymentId}/return` | Return |
 
 ```json
 {"idempotencyKey":"pay-20261026-0001","debtorAccountId":"00000000006",
@@ -637,203 +637,203 @@
  "paymentType":"ACH","reference":"INV-2026-10","description":"Utility bill"}
 ```
 
-### 7.6 billing-service 账单（P2）
+### 7.6 billing-service Statements (P2)
 
-| 方法 | 路径 | 说明 |
+| Method | Path | Description |
 |---|---|---|
-| POST | `/api/v1/statements/generate` | 生成账单（201，账户+期间幂等） |
-| GET | `/api/v1/statements/{statementId}` | 详情 |
-| GET | `/api/v1/statements?accountId=&page=&size=` | 分页 |
-| POST | `/api/v1/statements/{statementId}/pay` | 全额支付 |
+| POST | `/api/v1/statements/generate` | Generate a statement (201, idempotent by account + period) |
+| GET | `/api/v1/statements/{statementId}` | Detail |
+| GET | `/api/v1/statements?accountId=&page=&size=` | Pagination |
+| POST | `/api/v1/statements/{statementId}/pay` | Full payment |
 
 ```json
 {"accountId":"00000000001","period":"2026-10"}
 ```
 
-### 7.7 limit-service 限额（P2）
+### 7.7 limit-service Limits (P2)
 
-| 方法 | 路径 | 说明 |
+| Method | Path | Description |
 |---|---|---|
-| POST | `/api/v1/limits` | 创建限额（201） |
-| GET | `/api/v1/limits?scopeType=&scopeId=&page=&size=` | 列表 |
-| GET | `/api/v1/limits/{limitId}` | 详情 |
-| PUT | `/api/v1/limits/{limitId}` | 调整额度 |
-| POST | `/api/v1/limits/{limitId}/usage` | 占用 |
-| POST | `/api/v1/limits/{limitId}/release` | 释放 |
-| GET | `/api/v1/limits/check?scopeType=&scopeId=&limitType=&currency=&amount=` | 可用性检查 |
+| POST | `/api/v1/limits` | Create a limit (201) |
+| GET | `/api/v1/limits?scopeType=&scopeId=&page=&size=` | List |
+| GET | `/api/v1/limits/{limitId}` | Detail |
+| PUT | `/api/v1/limits/{limitId}` | Adjust the limit |
+| POST | `/api/v1/limits/{limitId}/usage` | Hold |
+| POST | `/api/v1/limits/{limitId}/release` | Release |
+| GET | `/api/v1/limits/check?scopeType=&scopeId=&limitType=&currency=&amount=` | Availability check |
 
-### 7.8 fx-service 汇率（P2）
+### 7.8 fx-service FX (P2)
 
-| 方法 | 路径 | 说明 |
+| Method | Path | Description |
 |---|---|---|
-| GET | `/api/v1/fx/rates` | 汇率列表 |
-| POST | `/api/v1/fx/rates` | 维护汇率（upsert） |
-| POST | `/api/v1/fx/quotes` | 报价（201，5 分钟有效） |
-| POST | `/api/v1/fx/quotes/{quoteId}/execute` | 执行换汇（201） |
-| GET | `/api/v1/fx/conversions` | 换汇记录 |
+| GET | `/api/v1/fx/rates` | FX rate list |
+| POST | `/api/v1/fx/rates` | Maintain an FX rate (upsert) |
+| POST | `/api/v1/fx/quotes` | Quote (201, valid for 5 minutes) |
+| POST | `/api/v1/fx/quotes/{quoteId}/execute` | Execute conversion (201) |
+| GET | `/api/v1/fx/conversions` | Conversion records |
 
-### 7.9 P3/P4/P5 扩展 API（按前缀）
+### 7.9 P3/P4/P5 Extension APIs (by prefix)
 
-> 完整字段以各服务 `/v3/api-docs` 为准；下表给出契约入口与关键动作。
+> Complete fields are defined by each service's `/v3/api-docs`; the table below gives the contract entry points and key actions.
 
-| 服务 | 路径前缀 | 关键端点 |
+| Service | Path prefix | Key endpoints |
 |---|---|---|
-| loan | `/api/v1/loan-applications`、`/api/v1/loans` | 申请、approve/reject、disburse、schedule、repayments |
-| fraud | `/api/v1/fraud-evaluations`、`/api/v1/fraud-alerts` | 评分、警报、confirm/dismiss |
-| aml | `/api/v1/screenings`、`/api/v1/aml-alerts` | 筛查、警报、clear/escalate |
-| dispute | `/api/v1/disputes` | 开案、review、provisional-credit、chargeback、resolve |
-| collections | `/api/v1/delinquency-cases` | 建案、recalculate、promise-to-pay、resolve |
-| batch | `/api/v1/jobs`、`/api/v1/job-runs` | 作业定义、执行、历史 |
-| reporting | `/api/v1/reports`、`/api/v1/report-runs` | 定义、生成、结果行 |
-| notification | `/api/v1/notification-templates`、`/api/v1/notifications` | 模板、创建、发送 |
-| document | `/api/v1/documents` | 上传、元数据、content、archive、delete |
-| workflow | `/api/v1/workflow-definitions`、`/api/v1/workflow-tasks` | 定义、建任务、approve/reject |
-| audit | `/api/v1/audit-events` | 追加、详情、检索 |
-| reference | `/api/v1/reference` | 按 domain 列表、详情、增删改 |
+| loan | `/api/v1/loan-applications`, `/api/v1/loans` | apply, approve/reject, disburse, schedule, repayments |
+| fraud | `/api/v1/fraud-evaluations`, `/api/v1/fraud-alerts` | scoring, alerts, confirm/dismiss |
+| aml | `/api/v1/screenings`, `/api/v1/aml-alerts` | screening, alerts, clear/escalate |
+| dispute | `/api/v1/disputes` | open case, review, provisional-credit, chargeback, resolve |
+| collections | `/api/v1/delinquency-cases` | create case, recalculate, promise-to-pay, resolve |
+| batch | `/api/v1/jobs`, `/api/v1/job-runs` | job definitions, execution, history |
+| reporting | `/api/v1/reports`, `/api/v1/report-runs` | definitions, generation, result rows |
+| notification | `/api/v1/notification-templates`, `/api/v1/notifications` | templates, creation, sending |
+| document | `/api/v1/documents` | upload, metadata, content, archive, delete |
+| workflow | `/api/v1/workflow-definitions`, `/api/v1/workflow-tasks` | definitions, create task, approve/reject |
+| audit | `/api/v1/audit-events` | append, detail, search |
+| reference | `/api/v1/reference` | list by domain, detail, create/update/delete |
 | bff | `/api/v1/bff` | `GET /customer-overview?accountId=` |
 | search | `/api/v1/search` | `GET ?q=&type=&limit=` |
 
-### 7.10 marketing-service 高端卡分期返现
+### 7.10 marketing-service Premium Card Installment Cashback
 
-| 方法 | 路径 | 说明 |
+| Method | Path | Description |
 |---|---|---|
-| POST | `/api/v1/campaigns` | 创建活动（DRAFT，201，`durationMonths` 1–24） |
-| GET | `/api/v1/campaigns?status=&page=&size=` | 活动列表 |
-| GET | `/api/v1/campaigns/{id}` | 详情 |
-| POST | `/api/v1/campaigns/{id}/activate` `/pause` `/end` | 状态迁移 |
-| POST | `/api/v1/campaigns/{id}/enrollments` | 报名（幂等） |
-| GET | `/api/v1/campaigns/{id}/enrollments?page=&size=` | 报名列表 |
-| GET | `/api/v1/eligibilities?accountId=&cardNumber=&customerId=` | 客户资格 |
-| POST | `/api/v1/reward-evaluations` | 返现评估（交易入账后调用） |
-| GET | `/api/v1/rewards?accountId=&customerId=&page=&size=` | 返现记录 |
-| POST | `/api/v1/rewards/{rewardId}/retry` | 待入账重试 |
-| GET | `/api/v1/campaigns/{id}/performance` | 效果 |
-| GET | `/api/v1/marketing/summary` | 看板 |
+| POST | `/api/v1/campaigns` | Create a campaign (DRAFT, 201, `durationMonths` 1–24) |
+| GET | `/api/v1/campaigns?status=&page=&size=` | Campaign list |
+| GET | `/api/v1/campaigns/{id}` | Detail |
+| POST | `/api/v1/campaigns/{id}/activate` `/pause` `/end` | State transition |
+| POST | `/api/v1/campaigns/{id}/enrollments` | Enroll (idempotent) |
+| GET | `/api/v1/campaigns/{id}/enrollments?page=&size=` | Enrollment list |
+| GET | `/api/v1/eligibilities?accountId=&cardNumber=&customerId=` | Customer eligibility |
+| POST | `/api/v1/reward-evaluations` | Cashback evaluation (called after transaction posting) |
+| GET | `/api/v1/rewards?accountId=&customerId=&page=&size=` | Cashback records |
+| POST | `/api/v1/rewards/{rewardId}/retry` | Retry pending postings |
+| GET | `/api/v1/campaigns/{id}/performance` | Performance |
+| GET | `/api/v1/marketing/summary` | Dashboard |
 
-创建活动示例：
+Create campaign example:
 
 ```json
-{"code":"PLATINUM_3M_CASHBACK","name":"白金卡 3 个月消费返现",
+{"code":"PLATINUM_3M_CASHBACK","name":"Platinum 3-month purchase cashback",
  "startDate":"2026-10-01","durationMonths":3,
  "eligibleProductCodes":["PLATINUM"],"minTransactionAmount":50.00,
  "cashbackRate":0.05,"maxCashbackPerTransaction":30.00,
  "maxCashbackPerCustomer":300.00,"budget":50000.00,"enrollmentRequired":true}
 ```
 
-账户贷记：`POST /api/v1/accounts/{accountId}/credits`
-`{"creditId":"...","sourceType":"CASHBACK","amount":30.00,"description":"..."}`，`creditId` 幂等。
+Account credit: `POST /api/v1/accounts/{accountId}/credits`
+`{"creditId":"...","sourceType":"CASHBACK","amount":30.00,"description":"..."}`, with `creditId` idempotent.
 
-## 8. 错误码总表
+## 8. Error Code Summary
 
-| code | HTTP | 归属 | 含义 |
+| code | HTTP | Owner | Meaning |
 |---|---|---|---|
-| VALIDATION_FAILED | 400 | 全部 | 参数校验失败（`details` 给出字段与遗留文案） |
-| INVALID_CREDENTIALS | 401 | iam | 用户号或密码错误 |
-| USER_NOT_FOUND | 404 | iam | 用户不存在 |
-| USER_ALREADY_EXISTS | 409 | iam | 用户号重复 |
-| LAST_ADMIN | 409 | iam | 不允许删除/降级最后一个管理员 |
-| CANNOT_DELETE_SELF | 409 | iam | 不允许删除自己 |
-| CUSTOMER_NOT_FOUND | 404 | customer | 客户不存在 |
-| CUSTOMER_ALREADY_EXISTS | 409 | customer | 客户号重复 |
-| CARD_NOT_FOUND | 404 | card | 卡号不存在 |
-| CARD_ALREADY_EXISTS | 409 | card | 卡号重复 |
-| ACCOUNT_CUSTOMER_MISMATCH | 409 | card | 卡与账户/客户归属不一致 |
-| ACCOUNT_NOT_FOUND | 404 | account | 账户不存在 |
-| PRODUCT_NOT_FOUND | 404 | account | 账户产品不存在 |
-| PRODUCT_INACTIVE | 409 | account | 产品已停售 |
-| CREDIT_LIMIT_EXCEEDS_PRODUCT_MAX | 409 | account | 额度超过产品上限 |
-| CASH_LIMIT_EXCEEDS_PRODUCT_MAX | 409 | account | 取现额度超过产品上限 |
-| MISSING_PRODUCT_CODE | 409 | account | 账户缺少产品编码 |
-| ACCOUNT_INACTIVE | 409 | account | 账户状态非 Y，不能冻结 |
-| INVALID_HOLD_AMOUNT | 409 | account | 冻结金额 ≤ 0 |
-| INVALID_HOLD_REFERENCE | 409 | account | 冻结来源类型/幂等键为空 |
-| INVALID_HOLD_EXPIRY | 409 | account | 冻结过期时间不在将来 |
-| INSUFFICIENT_AVAILABLE_CREDIT | 409 | account | 可用额度不足 |
-| HOLD_NOT_FOUND | 404 | account | 冻结记录不存在 |
-| HOLD_NOT_RELEASABLE | 409 | account | 当前状态不可释放 |
-| HOLD_REFERENCE_CONFLICT | 409 | account | 幂等键已用于不同金额 |
-| HOLD_REFERENCE_REUSED | 409 | account | 幂等键已用于已关闭记录 |
-| POSTING_TYPE_NOT_FOUND | 404 | transaction | 过账类型不存在 |
-| POSTING_TYPE_INACTIVE | 409 | transaction | 过账类型停用 |
-| INVALID_POSTING_AMOUNT | 409 | transaction | 过账金额 ≤ 0 或精度超限 |
-| IDEMPOTENCY_KEY_REQUIRED | 400 | transaction | 缺少幂等键 |
-| IDEMPOTENCY_CONFLICT | 409 | transaction | 幂等键已用于不同请求 |
-| POSTING_BATCH_NOT_FOUND | 404 | transaction | 过账批次不存在 |
-| UNBALANCED_POSTING | 409 | transaction | 借贷分录不平衡 |
-| REVERSAL_NOT_ALLOWED | 409 | transaction | 冲正批次不可再冲正 |
-| JOURNAL_ENTRY_NOT_FOUND | 404 | ledger | 日记账分录不存在 |
-| JOURNAL_SOURCE_CONFLICT | 409 | ledger | 业务键已用于不同内容 |
-| UNBALANCED_JOURNAL | 409 | ledger | 日记账借贷不平衡 |
-| INVALID_JOURNAL_AMOUNT | 409 | ledger | 分录金额 ≤ 0 |
-| INVALID_JOURNAL_ENTRY | 409 | ledger | 分录来源/科目缺失 |
-| DUPLICATE_LINE_NO | 409 | ledger | 分录行号重复 |
-| JOURNAL_ALREADY_REVERSED | 409 | ledger | 分录已冲正 |
-| LEDGER_ACCOUNT_NOT_FOUND | 404 | ledger | 总账科目不存在 |
-| LEDGER_ACCOUNT_INACTIVE | 409 | ledger | 总账科目停用 |
-| PERIOD_NOT_FOUND | 404 | ledger | 会计期间不存在 |
-| PERIOD_CLOSED | 409 | ledger | 会计期间已关账 |
-| PERIOD_ALREADY_CLOSED | 409 | ledger | 重复关账 |
-| RECONCILIATION_RUN_NOT_FOUND | 404 | reconciliation | 对账运行不存在 |
-| RECONCILIATION_ITEM_NOT_FOUND | 404 | reconciliation | 对账明细不存在 |
-| EOD_RUN_NOT_FOUND | 404 | reconciliation | EOD 运行不存在 |
-| PAYMENT_NOT_FOUND | 404 | payment | 支付单不存在 |
-| ACCOUNT_REQUIRED | 400 | payment | 缺少付款账户 |
-| ACCOUNT_INACTIVE | 409 | account/payment | 账户状态非 Y |
-| IDEMPOTENCY_KEY_REQUIRED | 400 | transaction/payment | 缺少幂等键 |
-| IDEMPOTENCY_CONFLICT | 409 | transaction/payment | 幂等键已用于不同请求 |
-| INVALID_PAYMENT_AMOUNT | 409 | payment | 支付金额非法 |
-| INVALID_PAYMENT_TYPE | 409 | payment | 支付类型非法 |
-| INVALID_PAYMENT_STATUS | 400 | payment | 状态筛选值非法 |
-| PAYMENT_NOT_SCREENED | 409 | payment | 支付单非 SCREENED |
-| PAYMENT_NOT_ACCEPTED | 409 | payment | 支付单非 ACCEPTED |
-| PAYMENT_NOT_RETURNABLE | 409 | payment | 支付单不可退汇 |
-| STATEMENT_NOT_FOUND | 404 | billing | 账单不存在 |
-| STATEMENT_ALREADY_EXISTS | 409 | billing | 并发生成同一账户+期间 |
-| INVALID_PERIOD | 400 | billing | 期间格式非法 |
-| PRODUCT_NOT_FOUND | 404 | account/billing | 产品不存在 |
-| LIMIT_NOT_FOUND | 404 | limit | 限额不存在 |
-| LIMIT_EXCEEDED | 409 | limit | 超出限额 |
-| LIMIT_ALREADY_DEFINED | 409 | limit | 限额已存在 |
-| LIMIT_INACTIVE | 409 | limit | 限额停用 |
-| LIMIT_BELOW_USED | 409 | limit | 调整额度低于已用 |
-| INVALID_LIMIT_AMOUNT | 409 | limit | 额度非法 |
-| INVALID_LIMIT_RELEASE | 409 | limit | 释放金额非法 |
-| INVALID_LIMIT_SCOPE | 400 | limit | 限额范围非法 |
-| INVALID_LIMIT_TYPE | 400 | limit | 限额类型非法 |
-| RATE_NOT_FOUND | 404 | fx | 汇率不存在 |
-| RATE_CONFLICT | 409 | fx | 汇率并发冲突 |
-| RATE_INACTIVE | 409 | fx | 汇率停用 |
-| QUOTE_NOT_FOUND | 404 | fx | 报价不存在 |
-| QUOTE_EXPIRED | 409 | fx | 报价已过期 |
-| QUOTE_ALREADY_CONSUMED | 409 | fx | 报价已消费 |
-| INVALID_QUOTE_AMOUNT | 409 | fx | 报价金额非法 |
-| INVALID_RATE | 409 | fx | 汇率非法 |
-| SAME_CURRENCY | 409 | fx | 换入换出币种相同 |
-| CAMPAIGN_NOT_FOUND | 404 | marketing | 活动不存在 |
-| CAMPAIGN_CODE_EXISTS | 409 | marketing | 活动编码重复 |
-| INVALID_CAMPAIGN | 409 | marketing | 期限/费率/上限/预算非法 |
-| INVALID_CAMPAIGN_STATE | 409 | marketing | 非法状态迁移 |
-| NOT_ENROLLED | 409 | marketing | 未报名 |
-| PRODUCT_NOT_ELIGIBLE | 409 | marketing | 产品等级不匹配 |
-| OUTSIDE_WINDOW | 409 | marketing | 不在活动期限 |
-| AMOUNT_TOO_LOW | 409 | marketing | 未达最低消费 |
-| CUSTOMER_CAP_REACHED | 409 | marketing | 客户返现上限已满 |
-| BUDGET_EXHAUSTED | 409 | marketing | 活动预算已用完 |
-| REWARD_NOT_FOUND | 404 | marketing | 返现记录不存在 |
-| INVALID_CREDIT_AMOUNT | 409 | account | 贷记金额非法 |
-| CREDIT_ID_CONFLICT | 409 | account | 贷记幂等键跨账户复用 |
-| NOTHING_TO_PAY | 409 | account/transaction | 无欠款，不能还款 |
-| PAYMENT_EXCEEDS_BALANCE | 409 | account | 还款金额超过余额 |
-| INVALID_PAYMENT_AMOUNT | 409 | account | 还款金额 ≤ 0 |
-| CONCURRENT_UPDATE | 409 | account/card | 乐观锁冲突 |
-| TRANSACTION_NOT_FOUND | 404 | transaction | 交易不存在 |
-| DUPLICATE_TRANSACTION_ID | 409 | transaction | 交易号重复 |
-| ACCOUNT_OR_CARD_REQUIRED | 400 | transaction | 账户号与卡号至少一个 |
-| CARD_ACCOUNT_MISMATCH | 400 | transaction | 卡号与账户号不匹配 |
-| TRANSACTION_TYPE_NOT_FOUND | 404 | transaction | 交易类型不存在 |
-| REPORT_REFERENCE_ERROR | 409 | transaction | 报表引用完整性失败 |
-| CONFIRMATION_REQUIRED | 409 | transaction | 支付未确认 |
-| BILL_PAYMENT_CARD_NOT_FOUND | 409 | transaction | 账户下无卡，无法账单支付 |
-| AUTHORIZATION_NOT_FOUND | 404 | authorization | 授权记录不存在 |
-| AUTHORIZATION_SUMMARY_NOT_FOUND | 404 | authorization | 该账户无待授权汇总 |
-| DEPENDENCY_UNAVAILABLE | 503 | transaction/authorization | 下游服务不可用 |
+| VALIDATION_FAILED | 400 | All | Parameter validation failed (`details` gives the field and the legacy message) |
+| INVALID_CREDENTIALS | 401 | iam | Invalid user ID or password |
+| USER_NOT_FOUND | 404 | iam | User does not exist |
+| USER_ALREADY_EXISTS | 409 | iam | Duplicate user ID |
+| LAST_ADMIN | 409 | iam | Deleting or demoting the last administrator is not allowed |
+| CANNOT_DELETE_SELF | 409 | iam | Deleting yourself is not allowed |
+| CUSTOMER_NOT_FOUND | 404 | customer | Customer does not exist |
+| CUSTOMER_ALREADY_EXISTS | 409 | customer | Duplicate customer ID |
+| CARD_NOT_FOUND | 404 | card | Card number does not exist |
+| CARD_ALREADY_EXISTS | 409 | card | Duplicate card number |
+| ACCOUNT_CUSTOMER_MISMATCH | 409 | card | Card ownership does not match the account/customer |
+| ACCOUNT_NOT_FOUND | 404 | account | Account does not exist |
+| PRODUCT_NOT_FOUND | 404 | account | Account product does not exist |
+| PRODUCT_INACTIVE | 409 | account | Product discontinued |
+| CREDIT_LIMIT_EXCEEDS_PRODUCT_MAX | 409 | account | Limit exceeds the product maximum |
+| CASH_LIMIT_EXCEEDS_PRODUCT_MAX | 409 | account | Cash limit exceeds the product maximum |
+| MISSING_PRODUCT_CODE | 409 | account | Account is missing a product code |
+| ACCOUNT_INACTIVE | 409 | account | Account status is not Y; a hold cannot be placed |
+| INVALID_HOLD_AMOUNT | 409 | account | Hold amount ≤ 0 |
+| INVALID_HOLD_REFERENCE | 409 | account | Hold source type/idempotency key is empty |
+| INVALID_HOLD_EXPIRY | 409 | account | Hold expiry is not in the future |
+| INSUFFICIENT_AVAILABLE_CREDIT | 409 | account | Insufficient available credit |
+| HOLD_NOT_FOUND | 404 | account | Hold record does not exist |
+| HOLD_NOT_RELEASABLE | 409 | account | The current status cannot be released |
+| HOLD_REFERENCE_CONFLICT | 409 | account | Idempotency key already used for a different amount |
+| HOLD_REFERENCE_REUSED | 409 | account | Idempotency key already used for a closed record |
+| POSTING_TYPE_NOT_FOUND | 404 | transaction | Posting type does not exist |
+| POSTING_TYPE_INACTIVE | 409 | transaction | Posting type is inactive |
+| INVALID_POSTING_AMOUNT | 409 | transaction | Posting amount ≤ 0 or precision exceeded |
+| IDEMPOTENCY_KEY_REQUIRED | 400 | transaction | Missing idempotency key |
+| IDEMPOTENCY_CONFLICT | 409 | transaction | Idempotency key already used for a different request |
+| POSTING_BATCH_NOT_FOUND | 404 | transaction | Posting batch does not exist |
+| UNBALANCED_POSTING | 409 | transaction | Debit/credit legs are unbalanced |
+| REVERSAL_NOT_ALLOWED | 409 | transaction | A reversal batch cannot be reversed again |
+| JOURNAL_ENTRY_NOT_FOUND | 404 | ledger | Journal entry does not exist |
+| JOURNAL_SOURCE_CONFLICT | 409 | ledger | Business key already used for different content |
+| UNBALANCED_JOURNAL | 409 | ledger | Journal debits and credits are unbalanced |
+| INVALID_JOURNAL_AMOUNT | 409 | ledger | Entry amount ≤ 0 |
+| INVALID_JOURNAL_ENTRY | 409 | ledger | Entry source/account is missing |
+| DUPLICATE_LINE_NO | 409 | ledger | Duplicate entry line number |
+| JOURNAL_ALREADY_REVERSED | 409 | ledger | Entry has already been reversed |
+| LEDGER_ACCOUNT_NOT_FOUND | 404 | ledger | General ledger account does not exist |
+| LEDGER_ACCOUNT_INACTIVE | 409 | ledger | General ledger account is inactive |
+| PERIOD_NOT_FOUND | 404 | ledger | Accounting period does not exist |
+| PERIOD_CLOSED | 409 | ledger | Accounting period is closed |
+| PERIOD_ALREADY_CLOSED | 409 | ledger | Period already closed |
+| RECONCILIATION_RUN_NOT_FOUND | 404 | reconciliation | Reconciliation run does not exist |
+| RECONCILIATION_ITEM_NOT_FOUND | 404 | reconciliation | Reconciliation item does not exist |
+| EOD_RUN_NOT_FOUND | 404 | reconciliation | EOD run does not exist |
+| PAYMENT_NOT_FOUND | 404 | payment | Payment order does not exist |
+| ACCOUNT_REQUIRED | 400 | payment | Missing debit account |
+| ACCOUNT_INACTIVE | 409 | account/payment | Account status is not Y |
+| IDEMPOTENCY_KEY_REQUIRED | 400 | transaction/payment | Missing idempotency key |
+| IDEMPOTENCY_CONFLICT | 409 | transaction/payment | Idempotency key already used for a different request |
+| INVALID_PAYMENT_AMOUNT | 409 | payment | Invalid payment amount |
+| INVALID_PAYMENT_TYPE | 409 | payment | Invalid payment type |
+| INVALID_PAYMENT_STATUS | 400 | payment | Invalid status filter value |
+| PAYMENT_NOT_SCREENED | 409 | payment | Payment order is not SCREENED |
+| PAYMENT_NOT_ACCEPTED | 409 | payment | Payment order is not ACCEPTED |
+| PAYMENT_NOT_RETURNABLE | 409 | payment | Payment order cannot be returned |
+| STATEMENT_NOT_FOUND | 404 | billing | Statement does not exist |
+| STATEMENT_ALREADY_EXISTS | 409 | billing | Concurrent generation for the same account + period |
+| INVALID_PERIOD | 400 | billing | Invalid period format |
+| PRODUCT_NOT_FOUND | 404 | account/billing | Product does not exist |
+| LIMIT_NOT_FOUND | 404 | limit | Limit does not exist |
+| LIMIT_EXCEEDED | 409 | limit | Limit exceeded |
+| LIMIT_ALREADY_DEFINED | 409 | limit | Limit already defined |
+| LIMIT_INACTIVE | 409 | limit | Limit is inactive |
+| LIMIT_BELOW_USED | 409 | limit | Adjusted limit is below the amount used |
+| INVALID_LIMIT_AMOUNT | 409 | limit | Invalid limit amount |
+| INVALID_LIMIT_RELEASE | 409 | limit | Invalid release amount |
+| INVALID_LIMIT_SCOPE | 400 | limit | Invalid limit scope |
+| INVALID_LIMIT_TYPE | 400 | limit | Invalid limit type |
+| RATE_NOT_FOUND | 404 | fx | FX rate does not exist |
+| RATE_CONFLICT | 409 | fx | FX rate concurrency conflict |
+| RATE_INACTIVE | 409 | fx | FX rate is inactive |
+| QUOTE_NOT_FOUND | 404 | fx | Quote does not exist |
+| QUOTE_EXPIRED | 409 | fx | Quote has expired |
+| QUOTE_ALREADY_CONSUMED | 409 | fx | Quote already consumed |
+| INVALID_QUOTE_AMOUNT | 409 | fx | Invalid quote amount |
+| INVALID_RATE | 409 | fx | Invalid FX rate |
+| SAME_CURRENCY | 409 | fx | Source and target currency are the same |
+| CAMPAIGN_NOT_FOUND | 404 | marketing | Campaign does not exist |
+| CAMPAIGN_CODE_EXISTS | 409 | marketing | Duplicate campaign code |
+| INVALID_CAMPAIGN | 409 | marketing | Invalid duration/rate/cap/budget |
+| INVALID_CAMPAIGN_STATE | 409 | marketing | Invalid state transition |
+| NOT_ENROLLED | 409 | marketing | Not enrolled |
+| PRODUCT_NOT_ELIGIBLE | 409 | marketing | Product tier does not match |
+| OUTSIDE_WINDOW | 409 | marketing | Outside the campaign window |
+| AMOUNT_TOO_LOW | 409 | marketing | Below the minimum spend |
+| CUSTOMER_CAP_REACHED | 409 | marketing | Customer cashback cap reached |
+| BUDGET_EXHAUSTED | 409 | marketing | Campaign budget exhausted |
+| REWARD_NOT_FOUND | 404 | marketing | Cashback record does not exist |
+| INVALID_CREDIT_AMOUNT | 409 | account | Invalid credit amount |
+| CREDIT_ID_CONFLICT | 409 | account | Credit idempotency key reused across accounts |
+| NOTHING_TO_PAY | 409 | account/transaction | Nothing owed; repayment is not possible |
+| PAYMENT_EXCEEDS_BALANCE | 409 | account | Repayment amount exceeds the balance |
+| INVALID_PAYMENT_AMOUNT | 409 | account | Repayment amount ≤ 0 |
+| CONCURRENT_UPDATE | 409 | account/card | Optimistic locking conflict |
+| TRANSACTION_NOT_FOUND | 404 | transaction | Transaction does not exist |
+| DUPLICATE_TRANSACTION_ID | 409 | transaction | Duplicate transaction ID |
+| ACCOUNT_OR_CARD_REQUIRED | 400 | transaction | At least one of account number and card number is required |
+| CARD_ACCOUNT_MISMATCH | 400 | transaction | Card number does not match the account number |
+| TRANSACTION_TYPE_NOT_FOUND | 404 | transaction | Transaction type does not exist |
+| REPORT_REFERENCE_ERROR | 409 | transaction | Report referential integrity failure |
+| CONFIRMATION_REQUIRED | 409 | transaction | Payment not confirmed |
+| BILL_PAYMENT_CARD_NOT_FOUND | 409 | transaction | No card under the account; bill payment is not possible |
+| AUTHORIZATION_NOT_FOUND | 404 | authorization | Authorization record does not exist |
+| AUTHORIZATION_SUMMARY_NOT_FOUND | 404 | authorization | No pending authorization summary for this account |
+| DEPENDENCY_UNAVAILABLE | 503 | transaction/authorization | Downstream service unavailable |

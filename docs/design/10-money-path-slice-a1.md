@@ -1,146 +1,146 @@
-# 10 钱路径切片 A1 详细设计
+# 10 Money Path Slice A1 Detailed Design
 
-> 上游：`09-scale-up-blueprint.md` 方案 A（账户 → 交易 → 支付 → 总账 → 对账）
-> 状态：A1.1 实施中，A1.2–A1.4 设计待评审
+> Upstream: `09-scale-up-blueprint.md` Option A (account → transaction → payment → general ledger → reconciliation)
+> Status: A1.1 in implementation, A1.2–A1.4 design pending review
 
-## 1. 目标与非目标
+## 1. Goals and Non-Goals
 
-**目标**：把"账户余额加减"升级为可支撑支付/授权的资金模型：
+**Goals**: upgrade "adding to and subtracting from account balances" into a funds model that can support payments and authorizations:
 
-1. 账户由产品驱动（额度、费率、账单周期可配置）。
-2. 资金冻结（hold）与可用额度可查询、可释放、可幂等重试。
-3. 交易过账生成复式分录，账户与总账可对账。
-4. 一条跨行转账可完成"受理→筛查→过账→总账→对账→回单"。
+1. Accounts are product-driven (credit limit, rates and statement cycle are configurable).
+2. Funds holds and available credit are queryable, releasable and idempotently retryable.
+3. Transaction posting produces double-entry journal lines, and accounts and the general ledger can be reconciled.
+4. A single interbank transfer can complete "intake → screening → posting → general ledger → reconciliation → receipt".
 
-**非目标（本切片不做）**：真实清算网络接入、多币种核算、利息/账单完整引擎、监管报表。
+**Non-goals (not covered by this slice)**: real settlement network integration, multi-currency accounting, a complete interest/statement engine, regulatory reports.
 
-## 2. 增量拆分
+## 2. Increment Breakdown
 
-| 增量 | 内容 | 依赖 | 状态 |
+| Increment | Content | Depends on | Status |
 |---|---|---|---|
-| A1.1 | 账户产品化、资金冻结、可用额度 | 无 | 已实现 |
-| A1.2 | 交易类型目录、过账规则、复式记账、冲正 | A1.1 | 已实现 |
-| A1.3 | ledger-service：科目表、日记账、试算平衡、期间关账 | A1.2 | 已实现 |
-| A1.4 | 对账、EOD 批处理、差异处理 | A1.3 | 已实现 |
+| A1.1 | Account productization, funds hold, available credit | None | Implemented |
+| A1.2 | Transaction type catalog, posting rules, double-entry bookkeeping, reversal | A1.1 | Implemented |
+| A1.3 | ledger-service: chart of accounts, journal entries, trial balance, period close | A1.2 | Implemented |
+| A1.4 | Reconciliation, EOD batch processing, break handling | A1.3 | Implemented |
 
-## 3. A1.1 领域模型
+## 3. A1.1 Domain Model
 
-### 3.1 聚合
+### 3.1 Aggregates
 
-**AccountProduct（配置聚合）**
+**AccountProduct (configuration aggregate)**
 
-| 字段 | 说明 |
+| Field | Description |
 |---|---|
-| productCode | 产品编码，主键 |
-| name / category / currency | 名称、类别（CREDIT/DEBIT/SAVINGS）、币种 |
-| defaultCreditLimit / maxCreditLimit | 默认额度、额度上限 |
-| defaultCashLimit / maxCashLimit | 默认取现额度、上限 |
-| apr / monthlyFee / statementCycleDay | 年利率、月费、账单周期日 |
-| active | 是否可售 |
+| productCode | Product code, primary key |
+| name / category / currency | Name, category (CREDIT/DEBIT/SAVINGS), currency |
+| defaultCreditLimit / maxCreditLimit | Default limit, limit cap |
+| defaultCashLimit / maxCashLimit | Default cash limit, cap |
+| apr / monthlyFee / statementCycleDay | Annual percentage rate, monthly fee, statement cycle day |
+| active | Whether the product is on sale |
 
-**Account（账户聚合，扩展）**
+**Account (account aggregate, extended)**
 
-- 新增 `productCode`，开户时必须引用有效产品。
-- 可用额度 = `creditLimit - currentBalance - Σ(ACTIVE holds)`。
-- 账户状态非 `Y` 时禁止冻结。
+- Adds `productCode`; account opening must reference a valid product.
+- Available credit = `creditLimit - currentBalance - Σ(ACTIVE holds)`.
+- When the account status is not `Y`, holds are rejected.
 
-**AccountHold（冻结聚合）**
+**AccountHold (hold aggregate)**
 
-| 字段 | 说明 |
+| Field | Description |
 |---|---|
 | holdId | UUID |
-| accountId / amount | 账户、冻结金额 |
+| accountId / amount | Account, hold amount |
 | status | ACTIVE / RELEASED / EXPIRED / CAPTURED |
-| referenceType / referenceId | 来源类型与业务幂等键 |
-| createdAt / expiresAt / releasedAt | 时间 |
+| referenceType / referenceId | Source type and business idempotency key |
+| createdAt / expiresAt / releasedAt | Timestamps |
 
-### 3.2 业务规则
+### 3.2 Business Rules
 
-| 编号 | 规则 |
+| ID | Rule |
 |---|---|
-| AP-01 | 账户引用的产品必须存在且 `active=true`。 |
-| AP-02 | 账户 `creditLimit` 不得超过产品 `maxCreditLimit`。 |
-| AP-03 | 账户 `cashCreditLimit` 不得超过产品 `maxCashLimit`。 |
-| AH-01 | 只有 `activeStatus=Y` 的账户可以冻结。 |
-| AH-02 | 冻结金额必须大于 0，最多 2 位小数。 |
-| AH-03 | 冻结金额不得超过当前可用额度。 |
-| AH-04 | 同一账户 + `referenceId` 幂等：已存在 ACTIVE 记录且金额一致时返回原记录。 |
-| AH-05 | 同一 `referenceId` 金额不一致，或记录已释放/过期/捕获时，拒绝复用。 |
-| AH-06 | 释放已释放的 hold 幂等返回；非 ACTIVE 状态不可释放。 |
-| AH-07 | 已过期（`expiresAt < now`）的 hold 不再占用可用额度。 |
-| AH-08 | 创建/释放 hold 时对账户加悲观锁，避免并发超冻。 |
+| AP-01 | The product referenced by the account must exist and have `active=true`. |
+| AP-02 | The account `creditLimit` must not exceed the product `maxCreditLimit`. |
+| AP-03 | The account `cashCreditLimit` must not exceed the product `maxCashLimit`. |
+| AH-01 | Only accounts with `activeStatus=Y` can place holds. |
+| AH-02 | The hold amount must be greater than 0, with at most 2 decimal places. |
+| AH-03 | The hold amount must not exceed the current available credit. |
+| AH-04 | Idempotent per account + `referenceId`: when an ACTIVE record already exists with the same amount, the original record is returned. |
+| AH-05 | When the same `referenceId` carries a different amount, or the record is already released/expired/captured, reuse is rejected. |
+| AH-06 | Releasing an already released hold returns idempotently; a non-ACTIVE state cannot be released. |
+| AH-07 | An expired hold (`expiresAt < now`) no longer occupies available credit. |
+| AH-08 | Creating/releasing a hold takes a pessimistic lock on the account to avoid concurrent over-holds. |
 
-### 3.3 数据库（account-service，V4）
+### 3.3 Database (account-service, V4)
 
-- `account_product`：产品目录，种子 CLASSIC / GOLD / PLATINUM。
-- `account.product_code`：按现有额度映射产品。
-- `account_hold`：冻结记录，`(account_id, reference_id)` 唯一索引。
+- `account_product`: product catalog, seeded with CLASSIC / GOLD / PLATINUM.
+- `account.product_code`: maps existing limits to products.
+- `account_hold`: hold records, unique index on `(account_id, reference_id)`.
 
 ### 3.4 API
 
-| 方法 | 路径 | 说明 |
+| Method | Path | Description |
 |---|---|---|
-| GET | `/api/v1/account-products` | 产品列表 |
-| GET | `/api/v1/account-products/{productCode}` | 产品详情 |
-| GET | `/api/v1/accounts/{accountId}/credit-position` | 额度、余额、冻结、可用额度 |
-| GET | `/api/v1/accounts/{accountId}/holds?status=ACTIVE` | 冻结列表 |
-| POST | `/api/v1/accounts/{accountId}/holds` | 创建冻结 |
-| DELETE | `/api/v1/accounts/{accountId}/holds/{holdId}` | 释放冻结 |
+| GET | `/api/v1/account-products` | Product list |
+| GET | `/api/v1/account-products/{productCode}` | Product details |
+| GET | `/api/v1/accounts/{accountId}/credit-position` | Limit, balance, holds, available credit |
+| GET | `/api/v1/accounts/{accountId}/holds?status=ACTIVE` | Hold list |
+| POST | `/api/v1/accounts/{accountId}/holds` | Create a hold |
+| DELETE | `/api/v1/accounts/{accountId}/holds/{holdId}` | Release a hold |
 
-账户响应新增 `productCode`。
+The account response adds `productCode`.
 
-### 3.5 错误码
+### 3.5 Error Codes
 
-| 错误码 | HTTP | 场景 |
+| Error code | HTTP | Scenario |
 |---|---:|---|
-| PRODUCT_NOT_FOUND | 404 | 产品不存在 |
-| PRODUCT_INACTIVE | 409 | 产品停售 |
-| CREDIT_LIMIT_EXCEEDS_PRODUCT_MAX | 409 | 额度超产品上限 |
-| CASH_LIMIT_EXCEEDS_PRODUCT_MAX | 409 | 取现额度超上限 |
-| ACCOUNT_INACTIVE | 409 | 账户状态非 Y |
-| INVALID_HOLD_AMOUNT | 409 | 冻结金额非法 |
-| INSUFFICIENT_AVAILABLE_CREDIT | 409 | 可用额度不足 |
-| HOLD_NOT_FOUND | 404 | 冻结记录不存在 |
-| HOLD_NOT_RELEASABLE | 409 | 状态不可释放 |
-| HOLD_REFERENCE_CONFLICT | 409 | 幂等键金额冲突 |
-| HOLD_REFERENCE_REUSED | 409 | 已关闭记录被复用 |
+| PRODUCT_NOT_FOUND | 404 | Product does not exist |
+| PRODUCT_INACTIVE | 409 | Product is withdrawn from sale |
+| CREDIT_LIMIT_EXCEEDS_PRODUCT_MAX | 409 | Limit exceeds the product cap |
+| CASH_LIMIT_EXCEEDS_PRODUCT_MAX | 409 | Cash limit exceeds the cap |
+| ACCOUNT_INACTIVE | 409 | Account status is not Y |
+| INVALID_HOLD_AMOUNT | 409 | Invalid hold amount |
+| INSUFFICIENT_AVAILABLE_CREDIT | 409 | Insufficient available credit |
+| HOLD_NOT_FOUND | 404 | Hold record does not exist |
+| HOLD_NOT_RELEASABLE | 409 | Status is not releasable |
+| HOLD_REFERENCE_CONFLICT | 409 | Amount conflict on the idempotency key |
+| HOLD_REFERENCE_REUSED | 409 | A closed record was reused |
 
-### 3.6 验收标准
+### 3.6 Acceptance Criteria
 
-1. `GET /account-products` 返回 3 个种子产品；账户 1 为 CLASSIC，账户 6 为 PLATINUM。
-2. 账户 6 可用额度 = `8000 - 2450.75 - 冻结合计`。
-3. 冻结 100 元后可用额度减少 100；释放后恢复；重复释放不报错。
-4. 冻结超过可用额度返回 `INSUFFICIENT_AVAILABLE_CREDIT`。
-5. 同 `referenceId` 重复提交金额一致返回同一 hold；金额不一致返回 `HOLD_REFERENCE_CONFLICT`。
-6. 更新账户额度超过产品上限返回 `CREDIT_LIMIT_EXCEEDS_PRODUCT_MAX`。
-7. 并发冻结不会突破可用额度（悲观锁 + 集成测试）。
+1. `GET /account-products` returns the 3 seeded products; account 1 is CLASSIC and account 6 is PLATINUM.
+2. Account 6 available credit = `8000 - 2450.75 - total holds`.
+3. After a hold of 100, available credit drops by 100; releasing restores it; a repeated release does not error.
+4. A hold above the available credit returns `INSUFFICIENT_AVAILABLE_CREDIT`.
+5. Resubmitting the same `referenceId` with the same amount returns the same hold; a different amount returns `HOLD_REFERENCE_CONFLICT`.
+6. Updating an account limit above the product cap returns `CREDIT_LIMIT_EXCEEDS_PRODUCT_MAX`.
+7. Concurrent holds never break the available credit (pessimistic lock + integration test).
 
-## 4. A1.2 过账引擎（设计要点）
+## 4. A1.2 Posting Engine (design highlights)
 
-- `transaction_type` 目录：DEPOSIT、WITHDRAWAL、TRANSFER_IN/OUT、FEE、INTEREST、REVERSAL、ADJUSTMENT 等，每个类型绑定一组 `posting_rule`。
-- 过账请求携带 `idempotencyKey`；`posting_batch` + `posting_leg` 两张表。
-- 每个 leg 有方向（DR/CR）、科目、金额；同一批次借贷必须平衡。
-- 冲正生成反向批次并关联原批次；原批次标记 `REVERSED`。
-- 账户余额更新与分录写入同一本地事务；总账通过事件异步同步。
+- `transaction_type` catalog: DEPOSIT, WITHDRAWAL, TRANSFER_IN/OUT, FEE, INTEREST, REVERSAL, ADJUSTMENT and so on; each type binds a set of `posting_rule`.
+- Posting requests carry `idempotencyKey`; two tables, `posting_batch` + `posting_leg`.
+- Each leg has a direction (DR/CR), a ledger account and an amount; debits and credits must balance within a batch.
+- A reversal generates a reverse batch linked to the original; the original batch is marked `REVERSED`.
+- Account balance updates and journal line writes happen in the same local transaction; the general ledger is synchronized asynchronously through events.
 
-## 5. A1.3 总账服务（设计要点）
+## 5. A1.3 Ledger Service (design highlights)
 
-- 科目表（COA）：资产/负债/收入/费用，父子层级。
-- 日记账：`journal_entry` + `journal_line`，借贷平衡校验。
-- 过账规则：交易类型 → 科目映射，版本化。
-- 试算平衡、期间关账、总账与子账对账。
-- 事件消费：`PostingPosted` → 生成日记账；幂等键为 postingId。
+- Chart of accounts (COA): assets/liabilities/revenue/expenses, with a parent-child hierarchy.
+- Journal entries: `journal_entry` + `journal_line`, with debit/credit balance validation.
+- Posting rules: transaction type → ledger account mapping, versioned.
+- Trial balance, period close, reconciliation between general ledger and sub-ledger.
+- Event consumption: `PostingPosted` → generate a journal entry; the idempotency key is postingId.
 
-## 6. A1.4 对账与 EOD（设计要点）
+## 6. A1.4 Reconciliation and EOD (design highlights)
 
-- 对账任务：账户余额 vs 分录汇总、总账 vs 子账、清算文件 vs 内部记录。
-- 差异分类：缺失、金额不符、重复、时序差异；支持调账与挂账。
-- EOD 作业图：计息 → 费用 → 账单 → 逾期滚动 → 总账结转 → 对账 → 报表。
-- 断点、重跑幂等、失败告警。
+- Reconciliation jobs: account balance vs journal line totals, general ledger vs sub-ledger, settlement files vs internal records.
+- Break classification: missing, amount mismatch, duplicate, timing difference; supports adjustments and suspense posting.
+- EOD job graph: interest accrual → fees → statements → past-due roll → general ledger closing → reconciliation → reports.
+- Checkpoints, idempotent reruns, failure alerts.
 
-## 7. 测试策略
+## 7. Test Strategy
 
-- 领域单测：产品限额、可用额度、hold 状态机、并发边界。
-- 控制器测试：Happy path、幂等、额度不足、产品停售、非法状态。
-- 集成测试（后续）：Testcontainers + PostgreSQL，验证迁移与锁。
-- 契约测试（后续）：OpenAPI 快照，防止字段破坏。
+- Domain unit tests: product limits, available credit, hold state machine, concurrency boundaries.
+- Controller tests: happy path, idempotency, insufficient credit, product withdrawn from sale, illegal states.
+- Integration tests (later): Testcontainers + PostgreSQL, verifying migrations and locks.
+- Contract tests (later): OpenAPI snapshots to prevent field breakage.

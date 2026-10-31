@@ -1,54 +1,54 @@
-# ADR-006: 并发控制从"记录锁 + 快照比对"改为乐观锁
+# ADR-006: Concurrency Control Switched from "Record Lock + Snapshot Comparison" to Optimistic Locking
 
-| 项 | 内容 |
+| Item | Content |
 |----|------|
-| 编号 | ADR-006 |
-| 日期 | 2026-10-25 |
-| 状态 | 已接受 |
-| 关联需求 | BR-ACCT-06、BR-CARD-10 |
+| ID | ADR-006 |
+| Date | 2026-10-25 |
+| Status | Accepted |
+| Related requirements | BR-ACCT-06, BR-CARD-10 |
 
-## 背景
+## Context
 
-遗留在线维护程序在"取数"时使用 `READ ... UPDATE` 锁定记录，保存时把屏幕快照与库中当前值逐字段
-比对，不一致则提示 `Record changed by some one else. Please review`（`COACTUPC.cbl:4109-4191`、
-`COCRDUPC.cbl:1498-1520`）。该模型依赖 CICS 长事务，记录锁会跨越用户思考时间；Web/微服务架构
-不能持有数据库锁等待用户操作。
+Legacy online maintenance programs lock the record with `READ ... UPDATE` when reading data, and on save they compare the screen snapshot field by field
+against the current values in the database, prompting `Record changed by some one else. Please review` on mismatch (`COACTUPC.cbl:4109-4191`,
+`COCRDUPC.cbl:1498-1520`). That model relies on long CICS transactions, and record locks span the user's thinking time; a web/microservice architecture
+cannot hold database locks waiting for user actions.
 
-## 候选方案
+## Alternatives
 
-| 方案 | 描述 | 优点 | 缺点 |
+| Option | Description | Pros | Cons |
 |---|---|---|---|
-| 方案A：JPA `@Version` 乐观锁 | 每次更新校验版本号，冲突返回 409 | 无长事务锁；实现简单；语义等价（检测并发修改） | 需要客户端回传版本号；冲突需用户重试 |
-| 方案B：悲观锁（`SELECT FOR UPDATE`） | 请求内短锁 | 冲突率低时简单 | 仍无法覆盖"用户思考时间"；易死锁；吞吐差 |
-| 方案C：字段级合并 + 审计 | 记录字段变更，冲突自动合并 | 用户体验好 | 业务语义复杂（余额不可自动合并）；实现成本高 |
+| Option A: JPA `@Version` optimistic locking | Validate the version number on every update; return 409 on conflict | No long-transaction locks; simple to implement; semantically equivalent (detects concurrent modification) | Clients must send the version back; conflicts require the user to retry |
+| Option B: pessimistic locking (`SELECT FOR UPDATE`) | Short lock within the request | Simple when the conflict rate is low | Still cannot cover the "user thinking time"; prone to deadlocks; poor throughput |
+| Option C: field-level merge + audit | Record field changes and merge conflicts automatically | Good user experience | Complex business semantics (balances cannot be merged automatically); high implementation cost |
 
-## 量化权衡表
+## Quantitative Trade-off Table
 
-| 方案 | 实现成本 | 性能开销 | 运维时效 | 审计性 | 风险 |
+| Option | Implementation cost | Performance overhead | Operational agility | Auditability | Risk |
 |---|---|---|---|---|---|
-| A | 低 | 低 | 即时 | 高（版本号可追溯） | 低 |
-| B | 低 | 中高（锁等待） | 即时 | 中 | 中高（死锁/超时） |
-| C | 高 | 中 | 即时 | 高 | 中（合并错误） |
+| A | Low | Low | Immediate | High (version numbers are traceable) | Low |
+| B | Low | Medium-high (lock waits) | Immediate | Medium | Medium-high (deadlocks/timeouts) |
+| C | High | Medium | Immediate | High | Medium (merge errors) |
 
-## 决策
+## Decision
 
-采用方案 A：所有聚合表带 `version BIGINT`，实体使用 `@Version`；更新请求可携带 `version`，
-冲突时返回 `409 CONCURRENT_UPDATE`，提示语沿用遗留文案。
+Adopt Option A: every aggregate table has `version BIGINT` and entities use `@Version`; update requests may carry `version`,
+and a conflict returns `409 CONCURRENT_UPDATE`, with the legacy message text preserved.
 
-## 理由
+## Rationale
 
-1. 语义等价：遗留的"快照比对"本质就是乐观并发检测。
-2. 余额与额度不可自动合并，必须让调用方重新读取后重试。
-3. 与数据库无关，PostgreSQL/H2 行为一致，便于测试。
+1. Semantic equivalence: the legacy "snapshot comparison" is essentially optimistic concurrency detection.
+2. Balances and credit limits cannot be merged automatically, so callers must re-read and retry.
+3. Database independent: PostgreSQL/H2 behave the same, which simplifies testing.
 
-## 后果（影响与回退路径）
+## Consequences (Impact and Rollback Path)
 
-- 影响：更新接口需返回 `version`；前端在冲突时提示刷新。
-- 回退：如出现高冲突热点账户，可对单账户记账接口改为数据库行锁（`SELECT FOR UPDATE`）短事务，
-  其余接口保持乐观锁。
+- Impact: update APIs must return `version`; the front end prompts for a refresh on conflict.
+- Rollback: if a hot account with frequent conflicts appears, the single-account posting API can switch to short database row locks (`SELECT FOR UPDATE`),
+  while the other APIs keep optimistic locking.
 
-## 证据
+## Evidence
 
-- `COACTUPC.cbl:4109-4191`（9700-CHECK-CHANGE-IN-REC）
-- `COCRDUPC.cbl:1498-1520`（9300 并发比对）
-- `Account.java` / `Card.java` 中的 `@Version`
+- `COACTUPC.cbl:4109-4191` (9700-CHECK-CHANGE-IN-REC)
+- `COCRDUPC.cbl:1498-1520` (9300 concurrent comparison)
+- `@Version` in `Account.java` / `Card.java`

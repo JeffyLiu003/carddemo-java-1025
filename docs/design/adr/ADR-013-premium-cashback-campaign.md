@@ -1,50 +1,50 @@
-# ADR-013: 高端卡分期返现采用独立营销上下文
+# ADR-013: Premium Card Installment Cashback Uses an Independent Marketing Context
 
-| 项 | 内容 |
+| Item | Content |
 |----|------|
-| 编号 | ADR-013 |
-| 日期 | 2026-10-26 |
-| 状态 | 已接受 |
-| 关联需求 | `docs/design/17-premium-cashback-campaign.md` |
+| ID | ADR-013 |
+| Date | 2026-10-26 |
+| Status | Accepted |
+| Related requirements | `docs/design/17-premium-cashback-campaign.md` |
 
-## 背景
+## Context
 
-旧营销能力覆盖活动、报名、积分、返现、预算与效果，范围较宽且已被移除。
-新需求聚焦：白金卡等价值客户、未来 N 个月（默认 3 个月）消费返现。
-需要决定：
+The old marketing capability covered campaigns, enrollment, points, cashback, budget, and effectiveness; its scope was broad and it has been removed.
+The new requirement focuses on cashback for spending by high-value customers such as platinum cardholders over the next N months (3 months by default).
+The following must be decided:
 
-1. 营销是否重新作为独立服务；
-2. 返现如何入账；
-3. 活动期限与产品圈选如何建模；
-4. 营销失败是否影响交易入账。
+1. Whether marketing returns as an independent service;
+2. How cashback is posted;
+3. How campaign duration and product targeting are modeled;
+4. Whether marketing failures affect transaction posting.
 
-## 候选方案
+## Alternatives
 
-| 方案 | 描述 | 优点 | 缺点 |
+| Option | Description | Pros | Cons |
 |---|---|---|---|
-| A：营销逻辑内嵌 transaction-service | 入账时直接算返现并调账户 | 少一个服务 | 交易服务变重；活动配置/运营接口难独立演进 |
-| B：独立 marketing-service + 账户贷记（采用） | 交易入账后同步评估；营销服务管理活动/报名/奖励；返现调 account 贷记 | 边界清晰；资金事实与营销权益分离；可独立运营 | 多一跳；最终一致 |
-| C：MQ 事件驱动 | 入账发事件，营销异步消费 | 解耦、可重放 | 需要 MQ 与消费治理，本期成本高 |
+| A: marketing logic embedded in transaction-service | Compute cashback and call the account directly during posting | One fewer service | The transaction service becomes heavier; campaign configuration/operations APIs are hard to evolve independently |
+| B: independent marketing-service + account credit (adopted) | Evaluate synchronously after transaction posting; the marketing service manages campaigns/enrollment/rewards; cashback calls account credit | Clear boundaries; money facts and marketing benefits are separated; can be operated independently | One extra hop; eventual consistency |
+| C: MQ event-driven | Posting emits events, marketing consumes asynchronously | Decoupled and replayable | Requires MQ and consumption governance; high cost for this phase |
 
-## 决策
+## Decision
 
-采用方案 B，并约束：
+Adopt Option B with the following constraints:
 
-1. marketing-service 只负责活动、报名、返现计算与奖励记录；账户余额仍由 account-service 权威。
-2. transaction-service 入账成功后调用 `POST /reward-evaluations`；失败只 WARN，不回滚入账。
-3. 返现通过 `POST /accounts/{id}/credits` 入账，`creditId` 幂等；余额可负（溢缴）。
-4. 活动以 `startDate + durationMonths` 定义期限；按产品等级（PLATINUM/GOLD）圈选客户。
-5. 奖励以 `(campaignId, transactionId)` 幂等；预算/客户上限在营销库校验。
-6. 本期不恢复积分、A/B、复杂客群 DSL；后续可在同一上下文扩展。
+1. marketing-service is only responsible for campaigns, enrollment, cashback calculation, and reward records; account balances remain authoritative in account-service.
+2. After transaction-service posts successfully, it calls `POST /reward-evaluations`; failures only produce a `WARN` and do not roll back the posting.
+3. Cashback is posted via `POST /accounts/{id}/credits` with an idempotent `creditId`; balances may go negative (overpayment).
+4. Campaigns define their duration with `startDate + durationMonths`; customers are targeted by product tier (PLATINUM/GOLD).
+5. Rewards are idempotent by `(campaignId, transactionId)`; budget/customer caps are validated in the marketing database.
+6. This phase does not restore points, A/B testing, or a complex customer-segment DSL; they can be extended within the same context later.
 
-## 后果
+## Consequences
 
-- 营销不可用时交易仍成功，返现可能延迟；PENDING 可人工重试。
-- 预算/上限目前为单实例保护；多实例需行锁/条件更新（已列为风险）。
-- 账户贷记接口是通用能力，可被其他权益场景复用。
-- 旧 `08-marketing-capability.md` 与 ADR-009 不恢复；新设计以本 ADR 与 17 号文档为准。
+- Transactions still succeed when marketing is unavailable, and cashback may be delayed; PENDING rewards can be retried manually.
+- Budget/cap enforcement is currently single-instance only; multiple instances require row locks or conditional updates (already listed as a risk).
+- The account credit API is a generic capability that can be reused by other benefit scenarios.
+- The old `08-marketing-capability.md` and ADR-009 are not restored; the new design follows this ADR and document 17.
 
-## 证据
+## Evidence
 
 - `docs/design/17-premium-cashback-campaign.md`
 - `services/marketing-service/src/main/java/com/carddemo/marketing/domain/service/RewardCalculator.java`

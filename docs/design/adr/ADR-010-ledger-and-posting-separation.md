@@ -1,72 +1,72 @@
-# ADR-010: 过账引擎与总账的职责分离
+# ADR-010: Separation of Responsibilities between the Posting Engine and the General Ledger
 
-| 项 | 内容 |
+| Item | Content |
 |----|------|
-| 编号 | ADR-010 |
-| 日期 | 2026-10-26 |
-| 状态 | 已接受 |
-| 关联需求 | `docs/design/11-money-path-slice-a2.md`、A1.2/A1.3 |
+| ID | ADR-010 |
+| Date | 2026-10-26 |
+| Status | Accepted |
+| Related requirements | `docs/design/11-money-path-slice-a2.md`, A1.2/A1.3 |
 
-## 背景
+## Context
 
-A1.2 引入过账批次（业务交易 → 借贷分录），A1.3 引入总账（科目、日记账、试算平衡）。
-需要决定：
+A1.2 introduced posting batches (business transaction → debit/credit entries) and A1.3 introduced the general ledger (accounts, journal entries, trial balance).
+The following must be decided:
 
-1. 过账分录与总账日记账是否放在同一个服务/数据库；
-2. 账户余额变更、批次落库、总账记账三者的失败边界；
-3. 冲正如何保证两侧一致且可审计。
+1. Whether posting entries and general ledger journal entries live in the same service/database;
+2. The failure boundaries among account balance changes, batch persistence, and general ledger recording;
+3. How reversal keeps both sides consistent and auditable.
 
-约束：现有系统无 MQ；账户余额在 account-service，交易在 transaction-service；演示环境要求
-一条命令启动、可重复演示。
+Constraints: the existing system has no MQ; account balances live in account-service and transactions in transaction-service; the demo environment requires
+a single-command start and repeatable demos.
 
-## 候选方案
+## Alternatives
 
-| 方案 | 描述 | 优点 | 缺点 |
+| Option | Description | Pros | Cons |
 |---|---|---|---|
-| A：合并到 transaction-service | 过账批次直接写总账科目/分录 | 单库事务，强一致；实现最简 | 总账与交易耦合；无法独立关账/审计；违背限界上下文 |
-| B：独立 ledger-service + 同步调用（失败告警） | transaction 先改账户、落批次，再 HTTP 写总账；总账幂等 | 边界清晰；可独立试算/关账；失败不影响资金事实 | 最终一致；总账可能短暂缺失，需要补偿/对账 |
-| C：Outbox + MQ | 批次落库时写 outbox，ledger 订阅事件 | 彻底解耦；可重放；吞吐高 | 需要 MQ 与消费治理；本期成本高 |
+| A: merge into transaction-service | Posting batches write general ledger accounts/entries directly | Single-database transaction, strong consistency; simplest to implement | General ledger coupled to transactions; cannot close the period or audit independently; violates bounded contexts |
+| B: independent ledger-service + synchronous call (alert on failure) | transaction updates the account and persists the batch first, then writes the general ledger over HTTP; the ledger is idempotent | Clear boundaries; trial balance/period close can run independently; failures do not affect the money facts | Eventual consistency; the ledger may briefly lack entries and needs compensation/reconciliation |
+| C: Outbox + MQ | Write to the outbox when persisting the batch; the ledger subscribes to events | Fully decoupled; replayable; high throughput | Requires MQ and consumption governance; high cost for this phase |
 
-## 量化权衡
+## Quantitative Trade-offs
 
-| 方案 | 实现成本 | 一致性 | 可审计性 | 运维复杂度 | 风险 |
+| Option | Implementation cost | Consistency | Auditability | Operational complexity | Risk |
 |---|---|---|---|---|---|
-| A | 低 | 强 | 中（交易与总账混在一起） | 低 | 总账演进受限 |
-| B | 中 | 最终（秒级） | 高（科目/期间/分录独立） | 中 | 总账写入失败需告警与补偿 |
-| C | 高 | 最终（可重放） | 高 | 高 | 消息积压/重复消费 |
+| A | Low | Strong | Medium (transactions and general ledger mixed together) | Low | General ledger evolution is constrained |
+| B | Medium | Eventual (seconds) | High (accounts/periods/entries are independent) | Medium | General ledger write failures require alerting and compensation |
+| C | High | Eventual (replayable) | High | High | Message backlog/duplicate consumption |
 
-## 决策
+## Decision
 
-采用方案 B，并落实：
+Adopt Option B and implement:
 
-1. **职责分离**：transaction-service 拥有业务交易、过账类型/规则/批次；ledger-service 拥有科目表、
-   日记账、期间。两边各自一个数据库，禁止跨库 JOIN。
-2. **调用顺序**：校验 → 调 account-service 改余额 → 本地保存批次与 legs → 调 ledger 写日记账。
-   总账调用异常只 `WARN`，批次保留 `ledger_entry_id = null`。
-3. **幂等**：过账批次以 `idempotencyKey` 唯一；总账以 `(sourceType, sourceId)` 唯一；
-   冲正批次/冲正分录各自使用确定性业务键，重复请求返回已有记录。
-4. **冲正**：不删除原记录。过账侧生成方向互换的冲正批次并标记原批次 `REVERSED`；
-   总账侧生成 `sourceType=REVERSAL` 的反向分录并标记原分录 `REVERSED`。
-5. **期间关账**：总账只允许在 OPEN 期间记账；关账不回压交易服务（见后果）。
+1. **Separation of responsibilities**: transaction-service owns business transactions, posting types/rules/batches; ledger-service owns the chart of accounts,
+   journal entries, and periods. Each side has its own database, and cross-database JOINs are forbidden.
+2. **Call order**: validate → call account-service to change the balance → save the batch and legs locally → call ledger to write the journal entry.
+   An exception in the general ledger call only produces a `WARN`, and the batch keeps `ledger_entry_id = null`.
+3. **Idempotency**: posting batches are unique by `idempotencyKey`; general ledger entries are unique by `(sourceType, sourceId)`;
+   reversal batches/reversal entries each use a deterministic business key, and duplicate requests return the existing record.
+4. **Reversal**: original records are never deleted. The posting side creates a reversal batch with swapped directions and marks the original batch `REVERSED`;
+   the ledger side creates a reverse entry with `sourceType=REVERSAL` and marks the original entry `REVERSED`.
+5. **Period close**: the general ledger only allows recording during OPEN periods; closing a period does not back-pressure the transaction service (see Consequences).
 
-## 理由
+## Rationale
 
-1. 资金事实（账户余额、过账批次）与会计投影（总账）失败域不同，合并会让报表/关账阻塞交易。
-2. 总账需要独立演进（多币种、合并报表、审计），独立服务边界更稳。
-3. 同步调用与现有 ADR-005 风格一致，不引入 MQ 即可演示完整链路；幂等键为未来 Outbox 重放预留。
+1. Money facts (account balances, posting batches) and the accounting projection (general ledger) have different failure domains; merging them would let reporting/period close block transactions.
+2. The general ledger needs to evolve independently (multi-currency, consolidated reports, audit), so a separate service boundary is more stable.
+3. Synchronous calls match the style of ADR-005, so the full chain can be demonstrated without introducing MQ; the idempotency keys are reserved for future Outbox replay.
 
-## 后果（影响与回退）
+## Consequences (Impact and Rollback)
 
-- **最终一致**：总账可能短暂缺少某笔分录；`ledger_entry_id` 为空可作为补偿作业的扫描条件。
-- **关账不阻塞交易**：已关账期间仍可能发生业务过账，此时总账同步失败并告警；生产化需增加
-  "关账前冻结交易"或"跨期自动转入下一期间"策略。
-- **试算平衡口径**：按期间发生额汇总，包含原分录与冲正分录；不含期初余额。
-- **回退**：关闭 `ledger.sync-enabled` 即停止总账同步；交易与账户不受影响。若改为方案 C，
-  只需把同步调用替换为 outbox 发布，接口与幂等键不变。
+- **Eventual consistency**: the general ledger may briefly lack an entry; an empty `ledger_entry_id` can serve as the scan condition for the compensation job.
+- **Period close does not block transactions**: business postings can still occur in a closed period, in which case the general ledger sync fails and raises an alert; going to production requires
+  a "freeze transactions before period close" or "automatically carry over to the next period" strategy.
+- **Trial balance scope**: aggregated by period movement, including original entries and reversal entries; opening balances are excluded.
+- **Rollback**: setting `ledger.sync-enabled` to false stops general ledger synchronization; transactions and accounts are unaffected. To switch to Option C,
+  only the synchronous call needs to be replaced by outbox publishing, with the interface and idempotency keys unchanged.
 
-## 证据
+## Evidence
 
-- `docs/design/11-money-path-slice-a2.md` §2、§3
-- `docs/design/03-service-decomposition.md` §3、§5
+- `docs/design/11-money-path-slice-a2.md` §2, §3
+- `docs/design/03-service-decomposition.md` §3, §5
 - `services/transaction-service/src/main/java/com/carddemo/transaction/application/PostingBatchService.java`
 - `services/ledger-service/src/main/java/com/carddemo/ledger/application/JournalEntryApplicationService.java`
