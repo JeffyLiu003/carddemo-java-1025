@@ -15,7 +15,6 @@ import com.carddemo.loan.domain.service.AmortizationCalculator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -74,10 +73,9 @@ public class LoanApplicationService {
         application.approve(decidedAt);
 
         Loan loan = Loan.originate(UUID.randomUUID().toString(), application);
-        LocalDate firstDueDate = decidedAt.toLocalDate().plusMonths(1);
         List<RepaymentSchedule> schedule = AmortizationCalculator
                 .buildSchedule(application.getPrincipal(), application.getAnnualRate(),
-                        application.getTermMonths(), firstDueDate)
+                        application.getTermMonths(), decidedAt.toLocalDate())
                 .stream()
                 .map(line -> RepaymentSchedule.installment(UUID.randomUUID().toString(), loan.getLoanId(),
                         line.installmentNo(), line.dueDate(), line.principalDue(), line.interestDue()))

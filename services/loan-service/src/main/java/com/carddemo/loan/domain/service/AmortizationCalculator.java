@@ -40,10 +40,13 @@ public final class AmortizationCalculator {
     }
 
     /**
-     * 生成完整还款计划；{@code firstDueDate} 为第 1 期到期日，此后每月同日。
+     * 生成完整还款计划；后续各期 = {@code anchorDate} + 期次月数。
+     * <p>
+     * 以基准日（而非第 1 期到期日）逐期加月，月末日期才不会被连续截断：
+     * 基准日 2026-10-31 时各期为 11-30、12-31、01-31，而不是 11-30、12-30、01-30。
      */
     public static List<ScheduleLine> buildSchedule(BigDecimal principal, BigDecimal annualRate,
-                                                   int termMonths, LocalDate firstDueDate) {
+                                                   int termMonths, LocalDate anchorDate) {
         BigDecimal monthlyRate = monthlyRate(annualRate);
         BigDecimal payment = monthlyPayment(principal, annualRate, termMonths);
         BigDecimal remaining = principal.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
@@ -54,7 +57,7 @@ public final class AmortizationCalculator {
             BigDecimal principalDue = installmentNo == termMonths
                     ? remaining
                     : payment.subtract(interest);
-            lines.add(new ScheduleLine(installmentNo, firstDueDate.plusMonths(installmentNo - 1L),
+            lines.add(new ScheduleLine(installmentNo, anchorDate.plusMonths(installmentNo),
                     principalDue, interest, principalDue.add(interest)));
             remaining = remaining.subtract(principalDue);
         }

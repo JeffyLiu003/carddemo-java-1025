@@ -87,6 +87,12 @@ class AuthorizationControllerTest {
         when(accountClient.findAccount(ACCOUNT_ID)).thenReturn(Optional.of(account));
     }
 
+    /**
+     * 请求时间戳跟随当前时间。清理接口按“系统时间 − expiryDays”判定过期，
+     * 写成固定日期会让用例在若干天后失效（新授权被一并当作过期明细清理）。
+     */
+    private static final LocalDateTime AUTH_TIMESTAMP = LocalDateTime.now().withNano(0);
+
     private String authorizationRequest(String amount, String transactionId) {
         return """
                 {
@@ -106,9 +112,9 @@ class AuthorizationControllerTest {
                   "merchantState": "IL",
                   "merchantZip": "62704",
                   "transactionId": "%s",
-                  "authTimestamp": "2026-10-25T10:15:00"
+                  "authTimestamp": "%s"
                 }
-                """.formatted(CARD_NUMBER, amount, transactionId);
+                """.formatted(CARD_NUMBER, amount, transactionId, AUTH_TIMESTAMP);
     }
 
     private MvcResult authorize(String amount, String transactionId) throws Exception {
@@ -130,7 +136,7 @@ class AuthorizationControllerTest {
                 .andExpect(jsonPath("$.authorizationId").isNotEmpty())
                 .andExpect(jsonPath("$.cardNumber").value(CARD_NUMBER))
                 .andExpect(jsonPath("$.transactionId").value("TXN000000000001"))
-                .andExpect(jsonPath("$.authTimestamp").value("2026-10-25T10:15:00"))
+                .andExpect(jsonPath("$.authTimestamp").value(AUTH_TIMESTAMP.toString()))
                 .andExpect(jsonPath("$.responseCode").value("00"))
                 .andExpect(jsonPath("$.reasonCode").value("0000"))
                 .andExpect(jsonPath("$.accountId").value(ACCOUNT_ID))

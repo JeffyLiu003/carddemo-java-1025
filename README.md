@@ -16,7 +16,7 @@ Every row in the table below has been verified against the code on the `main` br
 | Services | 27 Java microservices plus `web-ui`; the Maven reactor aggregates 28 modules |
 | Databases | 25 separate databases (`bff` and `search` are stateless and have no database) |
 | Containers | 17 by default in Compose (15 microservices + web-ui + postgres); the `extended` profile adds 12 more |
-| Tests | All 816 test cases pass under `mvn test` (H2 + Flyway) |
+| Tests | All 818 test cases pass under `mvn test` (H2 + Flyway) |
 | Decisions | 12 ADRs (ADR-001–008 and 010–013; ADR-009 was removed with the legacy marketing module) |
 | Latest capability | Term-based purchase cashback campaign for premium cards (marketing-service; see ADR-013 and `docs/design/17-premium-cashback-campaign.md`) |
 
@@ -211,7 +211,7 @@ Open **http://localhost:8090/** to reach the business UI (the login account is p
 All unit/integration tests:
 
 ```bash
-mvn test        # 816 test cases, H2 + Flyway, multi-module in parallel
+mvn test        # 818 test cases, H2 + Flyway, multi-module in parallel
 ```
 
 Optional capabilities and verification scripts:
