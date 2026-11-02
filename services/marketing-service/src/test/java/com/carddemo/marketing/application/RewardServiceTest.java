@@ -79,6 +79,17 @@ class RewardServiceTest {
         return campaign("TEST_PLATINUM", "PLATINUM", "2026-10-01", "300.00", budget);
     }
 
+    /**
+     * 额外返现活动：费率 0.005，其余口径与主体白金活动一致（REQ-2026-005）。
+     */
+    private Campaign extraCashbackCampaign(String budget) {
+        Campaign campaign = campaigns.create(new CreateCampaignCommand("TEST_PLATINUM_EXTRA", "额外返现活动",
+                "活动说明", LocalDate.parse("2026-10-01"), 3, List.of("PLATINUM"), new BigDecimal("50.00"),
+                new BigDecimal("0.005"), new BigDecimal("30.00"), new BigDecimal("300.00"),
+                new BigDecimal(budget), true));
+        return campaigns.activate(campaign.getCampaignId());
+    }
+
     private void enroll(Campaign campaign) {
         enrollments.enroll(campaign.getCampaignId(), ACCOUNT_ID, CARD_NUMBER, CUSTOMER_ID);
     }
@@ -121,6 +132,78 @@ class RewardServiceTest {
         assertThat(page.total()).isEqualTo(1);
         assertThat(page.items().get(0).campaignCode()).isEqualTo("TEST_PLATINUM");
         assertThat(page.items().get(0).status()).isEqualTo("GRANTED");
+    }
+
+    /**
+     * REQ-2026-005：额外 0.5% 活动与主体 5% 活动并存，同一交易分别发放（120.00 → 6.00 + 0.60）。
+     */
+    @Test
+    void stacksExtraCashbackOnTopOfBaseCampaign() {
+        Campaign base = platinumCampaign("50000.00");
+        Campaign extra = extraCashbackCampaign("50000.00");
+        stubAccount("PLATINUM", true);
+        enroll(base);
+        enroll(extra);
+
+        EvaluationResult result = evaluate("TXN-STACK", "120.00", OCCURRED_AT);
+
+        assertThat(result.skipped()).isEmpty();
+        assertThat(result.grants()).extracting(EvaluationResult.Grant::campaignCode)
+                .containsExactlyInAnyOrder("TEST_PLATINUM", "TEST_PLATINUM_EXTRA");
+        EvaluationResult.Grant baseGrant = result.grants().stream()
+                .filter(grant -> grant.campaignCode().equals("TEST_PLATINUM")).findFirst().orElseThrow();
+        EvaluationResult.Grant extraGrant = result.grants().stream()
+                .filter(grant -> grant.campaignCode().equals("TEST_PLATINUM_EXTRA")).findFirst().orElseThrow();
+        assertThat(baseGrant.cashbackAmount()).isEqualByComparingTo("6.00");
+        assertThat(extraGrant.cashbackAmount()).isEqualByComparingTo("0.60");
+        assertThat(baseGrant.status()).isEqualTo(RewardGrantStatus.GRANTED.name());
+        assertThat(extraGrant.status()).isEqualTo(RewardGrantStatus.GRANTED.name());
+        verify(accountClient).credit(ACCOUNT_ID, baseGrant.rewardId(), new BigDecimal("6.00"),
+                "TEST_PLATINUM cashback");
+        verify(accountClient).credit(ACCOUNT_ID, extraGrant.rewardId(), new BigDecimal("0.60"),
+                "TEST_PLATINUM_EXTRA cashback");
+        assertThat(campaigns.get(base.getCampaignId()).getConsumedBudget()).isEqualByComparingTo("6.00");
+        assertThat(campaigns.get(extra.getCampaignId()).getConsumedBudget()).isEqualByComparingTo("0.60");
+
+        EvaluationResult repeated = evaluate("TXN-STACK", "120.00", OCCURRED_AT);
+
+        assertThat(repeated.grants()).isEmpty();
+        assertThat(repeated.skipped()).hasSize(2)
+                .allSatisfy(skip -> assertThat(skip.reason()).isEqualTo("ALREADY_EVALUATED"));
+        verify(accountClient, times(2)).credit(any(), any(), any(), any());
+    }
+
+    /**
+     * 额外活动沿用门槛与各自上限：40.00 时两个活动都跳过；1000.00 时主体封顶 30.00、额外 5.00。
+     */
+    @Test
+    void extraCashbackKeepsMinimumAmountAndOwnCaps() {
+        Campaign base = platinumCampaign("50000.00");
+        Campaign extra = extraCashbackCampaign("50000.00");
+        stubAccount("PLATINUM", true);
+        enroll(base);
+        enroll(extra);
+
+        EvaluationResult belowMinimum = evaluate("TXN-EXTRA-LOW", "40.00", OCCURRED_AT);
+
+        assertThat(belowMinimum.grants()).isEmpty();
+        assertThat(belowMinimum.skipped()).hasSize(2)
+                .allSatisfy(skip -> assertThat(skip.reason()).isEqualTo("AMOUNT_TOO_LOW"));
+
+        EvaluationResult capped = evaluate("TXN-EXTRA-CAP", "1000.00", OCCURRED_AT);
+
+        assertThat(capped.grants()).extracting(EvaluationResult.Grant::campaignCode)
+                .containsExactlyInAnyOrder("TEST_PLATINUM", "TEST_PLATINUM_EXTRA");
+        BigDecimal baseAmount = capped.grants().stream()
+                .filter(grant -> grant.campaignCode().equals("TEST_PLATINUM")).findFirst().orElseThrow()
+                .cashbackAmount();
+        BigDecimal extraAmount = capped.grants().stream()
+                .filter(grant -> grant.campaignCode().equals("TEST_PLATINUM_EXTRA")).findFirst().orElseThrow()
+                .cashbackAmount();
+        assertThat(baseAmount).isEqualByComparingTo("30.00");
+        assertThat(extraAmount).isEqualByComparingTo("5.00");
+        assertThat(baseAmount.add(extraAmount)).isEqualByComparingTo("35.00");
+        assertThat(campaigns.get(extra.getCampaignId()).getConsumedBudget()).isEqualByComparingTo("5.00");
     }
 
     @Test

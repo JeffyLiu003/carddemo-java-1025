@@ -56,4 +56,27 @@ class MarketingSeedTest {
         assertThat(gold.getBudget()).isEqualByComparingTo("20000.00");
         assertThat(gold.isEnrollmentRequired()).isTrue();
     }
+
+    /**
+     * V3 额外返现活动：费率 0.005、窗口 2026-11-01 起 3 个月，其余参数沿用既有白金活动。
+     */
+    @Test
+    void seedsPlatinumExtraCashbackCampaign() {
+        Campaign extra = campaigns.list(null, 0, 20).items().stream()
+                .filter(campaign -> campaign.getCode().equals("PLATINUM_EXTRA_0P5_CASHBACK"))
+                .findFirst().orElseThrow();
+
+        assertThat(extra.getStatus()).isEqualTo(CampaignStatus.ACTIVE);
+        assertThat(extra.getStartDate()).isEqualTo(LocalDate.of(2026, 11, 1));
+        assertThat(extra.getDurationMonths()).isEqualTo(3);
+        assertThat(extra.getEndDate()).isEqualTo(LocalDate.of(2027, 1, 31));
+        assertThat(extra.productCodes()).containsExactly("PLATINUM");
+        assertThat(extra.getMinTransactionAmount()).isEqualByComparingTo("50.00");
+        assertThat(extra.getCashbackRate()).isEqualByComparingTo("0.005");
+        assertThat(extra.getMaxCashbackPerTransaction()).isEqualByComparingTo("30.00");
+        assertThat(extra.getMaxCashbackPerCustomer()).isEqualByComparingTo("300.00");
+        assertThat(extra.getBudget()).isEqualByComparingTo("50000.00");
+        assertThat(extra.getConsumedBudget()).isEqualByComparingTo("0.00");
+        assertThat(extra.isEnrollmentRequired()).isTrue();
+    }
 }
