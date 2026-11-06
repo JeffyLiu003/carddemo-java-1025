@@ -1,5 +1,6 @@
 package com.carddemo.marketing.application;
 
+import com.carddemo.marketing.domain.exception.InvalidRequestException;
 import com.carddemo.marketing.domain.exception.NotFoundException;
 import com.carddemo.marketing.domain.exception.RemoteServiceException;
 import com.carddemo.marketing.domain.model.AccountPosition;
@@ -283,5 +284,17 @@ class RewardServiceTest {
         assertThatThrownBy(() -> evaluate("TXN-NO-ACCOUNT", "1000.00", OCCURRED_AT))
                 .isInstanceOf(NotFoundException.class)
                 .extracting("code").isEqualTo("ACCOUNT_NOT_FOUND");
+    }
+
+    @Test
+    void rejectsAmountThatIsNotAWholeNumberOfCents() {
+        Campaign campaign = platinumCampaign("50000.00");
+        stubAccount("PLATINUM", true);
+        enroll(campaign);
+
+        assertThatThrownBy(() -> evaluate("TXN-SUB-CENT", "12.345", OCCURRED_AT))
+                .isInstanceOf(InvalidRequestException.class)
+                .extracting("code").isEqualTo("INVALID_AMOUNT");
+        assertThat(jdbcTemplate.queryForObject("select count(*) from reward_grant", Integer.class)).isZero();
     }
 }

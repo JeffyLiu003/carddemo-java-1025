@@ -227,6 +227,10 @@ public class RewardService {
         if (amount == null || amount.signum() <= 0) {
             throw new InvalidRequestException("INVALID_AMOUNT", "Transaction amount must be greater than 0.");
         }
+        if (amount.stripTrailingZeros().scale() > AMOUNT_SCALE) {
+            throw new InvalidRequestException("INVALID_AMOUNT",
+                    "Transaction amount must be a whole number of cents.");
+        }
         return amount.setScale(AMOUNT_SCALE, RoundingMode.HALF_UP);
     }
 
