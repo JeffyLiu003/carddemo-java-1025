@@ -19,5 +19,17 @@ public record CampaignTerms(
         BigDecimal maxCashbackPerTransaction,
         BigDecimal maxCashbackPerCustomer,
         BigDecimal budget,
-        boolean enrollmentRequired) {
+        boolean enrollmentRequired,
+        ReversalPolicy reversalPolicy) {
+
+    /**
+     * 未指定追扣口径：口径保持未确认，退款受理返回 409 且不追扣。
+     */
+    public CampaignTerms(String code, String name, String description, LocalDate startDate, int durationMonths,
+                         List<String> eligibleProductCodes, BigDecimal minTransactionAmount, BigDecimal cashbackRate,
+                         BigDecimal maxCashbackPerTransaction, BigDecimal maxCashbackPerCustomer,
+                         BigDecimal budget, boolean enrollmentRequired) {
+        this(code, name, description, startDate, durationMonths, eligibleProductCodes, minTransactionAmount,
+                cashbackRate, maxCashbackPerTransaction, maxCashbackPerCustomer, budget, enrollmentRequired, null);
+    }
 }

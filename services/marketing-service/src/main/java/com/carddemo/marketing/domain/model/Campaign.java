@@ -99,6 +99,10 @@ public class Campaign {
     @Column(name = "enrollment_required", nullable = false)
     private boolean enrollmentRequired;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "reversal_policy", length = 16)
+    private ReversalPolicy reversalPolicy;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -138,6 +142,7 @@ public class Campaign {
         campaign.budget = requireAmount(terms.budget(), "budget", true);
         campaign.consumedBudget = ZERO;
         campaign.enrollmentRequired = terms.enrollmentRequired();
+        campaign.reversalPolicy = terms.reversalPolicy();
         campaign.createdAt = createdAt;
         campaign.updatedAt = createdAt;
         return campaign;
@@ -381,6 +386,13 @@ public class Campaign {
 
     public boolean isEnrollmentRequired() {
         return enrollmentRequired;
+    }
+
+    /**
+     * 追扣口径（PRD REQ-CB-07）：null 表示业务未确认，受理退款时返回 409 且不追扣。
+     */
+    public ReversalPolicy getReversalPolicy() {
+        return reversalPolicy;
     }
 
     public LocalDateTime getCreatedAt() {

@@ -1,6 +1,7 @@
 package com.carddemo.marketing.interfaces.rest.dto;
 
 import com.carddemo.marketing.application.CreateCampaignCommand;
+import com.carddemo.marketing.domain.model.ReversalPolicy;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -64,11 +65,16 @@ public record CreateCampaignRequest(
         BigDecimal budget,
 
         @Schema(description = "是否要求报名", example = "true")
-        boolean enrollmentRequired) {
+        boolean enrollmentRequired,
+
+        @Schema(description = "追扣口径；不填表示业务未确认（退款受理返回 409）", example = "PROPORTIONAL",
+                allowableValues = {"FULL", "PROPORTIONAL", "NONE"})
+        String reversalPolicy) {
 
     public CreateCampaignCommand toCommand() {
         return new CreateCampaignCommand(code, name, description, startDate,
                 durationMonths == null ? 0 : durationMonths, eligibleProductCodes, minTransactionAmount,
-                cashbackRate, maxCashbackPerTransaction, maxCashbackPerCustomer, budget, enrollmentRequired);
+                cashbackRate, maxCashbackPerTransaction, maxCashbackPerCustomer, budget, enrollmentRequired,
+                ReversalPolicy.parse(reversalPolicy));
     }
 }

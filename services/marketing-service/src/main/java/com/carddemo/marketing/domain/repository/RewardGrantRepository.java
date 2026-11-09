@@ -4,6 +4,7 @@ import com.carddemo.marketing.domain.model.RewardGrant;
 import com.carddemo.marketing.domain.model.RewardGrantStatus;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -16,6 +17,11 @@ public interface RewardGrantRepository {
     Optional<RewardGrant> findById(String rewardId);
 
     Optional<RewardGrant> findByCampaignIdAndTransactionId(String campaignId, String transactionId);
+
+    /**
+     * 原消费交易对应的全部奖励：多活动并存时同一交易可能有多条（PRD REQ-CB-07）。
+     */
+    List<RewardGrant> findByTransactionId(String transactionId);
 
     PageResult<RewardGrant> search(String accountId, String customerId, int page, int size);
 

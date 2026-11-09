@@ -1,6 +1,7 @@
 package com.carddemo.marketing.application;
 
 import com.carddemo.marketing.domain.model.CampaignTerms;
+import com.carddemo.marketing.domain.model.ReversalPolicy;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -21,11 +22,23 @@ public record CreateCampaignCommand(
         BigDecimal maxCashbackPerTransaction,
         BigDecimal maxCashbackPerCustomer,
         BigDecimal budget,
-        boolean enrollmentRequired) {
+        boolean enrollmentRequired,
+        ReversalPolicy reversalPolicy) {
+
+    /**
+     * 未指定追扣口径（既有调用方与既有活动）：口径保持未确认。
+     */
+    public CreateCampaignCommand(String code, String name, String description, LocalDate startDate, int durationMonths,
+                                 List<String> eligibleProductCodes, BigDecimal minTransactionAmount,
+                                 BigDecimal cashbackRate, BigDecimal maxCashbackPerTransaction,
+                                 BigDecimal maxCashbackPerCustomer, BigDecimal budget, boolean enrollmentRequired) {
+        this(code, name, description, startDate, durationMonths, eligibleProductCodes, minTransactionAmount,
+                cashbackRate, maxCashbackPerTransaction, maxCashbackPerCustomer, budget, enrollmentRequired, null);
+    }
 
     public CampaignTerms toTerms() {
         return new CampaignTerms(code, name, description, startDate, durationMonths, eligibleProductCodes,
                 minTransactionAmount, cashbackRate, maxCashbackPerTransaction, maxCashbackPerCustomer,
-                budget, enrollmentRequired);
+                budget, enrollmentRequired, reversalPolicy);
     }
 }
