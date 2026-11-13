@@ -88,8 +88,11 @@ post(commands)
 | `nonPurchasePostingSkipsMarketingEvaluation` | 边界/分类 | `typeCode=02` 入账成功、余额 `02/0002` 增加 75.00，`marketingClient` 从未被调用 |
 | `marketingFailureDoesNotRollBackPosting` | 异常 | 营销不可用时入账成功、状态 `POSTED` |
 | `duplicateTransactionIdIsIdempotent` 等 | 幂等/异常 | 基线用例保持通过 |
+| `RewardServiceTest.stacksPremiumAndExtraHalfPercentCampaigns` | 叠加/正常 | 5% 与额外 0.5% 两个 ACTIVE 活动命中同一 1000.00 交易 → 2 条 grant（30.00、5.00），预算各自消耗，`credit` 调用 2 次 |
+| `RewardServiceTest.grantsExtraHalfPercentWithinWindowAndCapsSingleTransaction` | 费率/边界 | 0.005 费率：120.00→0.60、6000.00→30.00 封顶；2027-02-13 交易 → `OUTSIDE_WINDOW` |
+| `MarketingControllerTest.evaluationRejectsZeroAmount` | 接口/异常 | `amount=0.00` → 400 `INVALID_AMOUNT` |
 
-执行结果：`mvn -B test`（transaction-service 模块）共 66 个用例全部通过，其中 `PostingServiceTest` 7 个。
+执行结果：`mvn -B test` 在 `services/transaction-service` 共 66 个用例、`services/marketing-service` 共 45 个用例全部通过（`PostingServiceTest` 7 个、`RewardServiceTest` 11 个、`MarketingControllerTest` 8 个）。跨服务端到端仍受限于本地无容器环境，见 `docs/verification/` 下的验证报告。
 
 ## 6. 部署与回退
 

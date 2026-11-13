@@ -284,4 +284,58 @@ class RewardServiceTest {
                 .isInstanceOf(NotFoundException.class)
                 .extracting("code").isEqualTo("ACCOUNT_NOT_FOUND");
     }
+
+    private Campaign extraHalfPercentCampaign() {
+        Campaign campaign = campaigns.create(new CreateCampaignCommand("TEST_EXTRA_HALF_PERCENT",
+                "额外 0.5% 返现", "白金卡消费额外 0.5%", LocalDate.parse("2026-11-13"), 3,
+                List.of("PLATINUM"), new BigDecimal("50.00"), new BigDecimal("0.005"),
+                new BigDecimal("30.00"), new BigDecimal("300.00"), new BigDecimal("50000.00"), false));
+        return campaigns.activate(campaign.getCampaignId());
+    }
+
+    private static final LocalDateTime EXTRA_WINDOW = LocalDateTime.of(2026, 11, 20, 10, 15);
+
+    @Test
+    void stacksPremiumAndExtraHalfPercentCampaigns() {
+        Campaign premium = platinumCampaign("50000.00");
+        extraHalfPercentCampaign();
+        stubAccount("PLATINUM", true);
+        enroll(premium);
+
+        EvaluationResult result = rewards.evaluate(new EvaluateRewardCommand("TXN-STACK", ACCOUNT_ID,
+                CARD_NUMBER, CUSTOMER_ID, new BigDecimal("1000.00"), EXTRA_WINDOW));
+
+        assertThat(result.skipped()).isEmpty();
+        assertThat(result.grants()).hasSize(2);
+        assertThat(result.grants()).filteredOn(grant -> grant.campaignCode().equals("TEST_PLATINUM"))
+                .singleElement().extracting(EvaluationResult.Grant::cashbackAmount)
+                .isEqualTo(new BigDecimal("30.00"));
+        assertThat(result.grants()).filteredOn(grant -> grant.campaignCode().equals("TEST_EXTRA_HALF_PERCENT"))
+                .singleElement().extracting(EvaluationResult.Grant::cashbackAmount)
+                .isEqualTo(new BigDecimal("5.00"));
+        assertThat(campaigns.get(premium.getCampaignId()).getConsumedBudget()).isEqualByComparingTo("30.00");
+        verify(accountClient, times(2)).credit(any(), any(), any(), any());
+    }
+
+    @Test
+    void grantsExtraHalfPercentWithinWindowAndCapsSingleTransaction() {
+        extraHalfPercentCampaign();
+        stubAccount("PLATINUM", true);
+
+        EvaluationResult hundredTwenty = rewards.evaluate(new EvaluateRewardCommand("TXN-120", ACCOUNT_ID,
+                CARD_NUMBER, CUSTOMER_ID, new BigDecimal("120.00"), EXTRA_WINDOW));
+        assertThat(hundredTwenty.grants()).singleElement()
+                .extracting(EvaluationResult.Grant::cashbackAmount).isEqualTo(new BigDecimal("0.60"));
+
+        EvaluationResult sixThousand = rewards.evaluate(new EvaluateRewardCommand("TXN-6000", ACCOUNT_ID,
+                CARD_NUMBER, CUSTOMER_ID, new BigDecimal("6000.00"), EXTRA_WINDOW));
+        assertThat(sixThousand.grants()).singleElement()
+                .extracting(EvaluationResult.Grant::cashbackAmount).isEqualTo(new BigDecimal("30.00"));
+
+        EvaluationResult afterWindow = rewards.evaluate(new EvaluateRewardCommand("TXN-AFTER-WINDOW", ACCOUNT_ID,
+                CARD_NUMBER, CUSTOMER_ID, new BigDecimal("120.00"), LocalDateTime.of(2027, 2, 13, 0, 0)));
+        assertThat(afterWindow.grants()).isEmpty();
+        assertThat(afterWindow.skipped()).singleElement()
+                .extracting(EvaluationResult.Skip::reason).isEqualTo("OUTSIDE_WINDOW");
+    }
 }

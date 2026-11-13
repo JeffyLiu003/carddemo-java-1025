@@ -327,6 +327,18 @@ class MarketingControllerTest {
                 .andExpect(jsonPath("$.pendingRewards").value(0));
     }
 
+    @Test
+    void evaluationRejectsZeroAmount() throws Exception {
+        mockMvc.perform(post("/api/v1/reward-evaluations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"transactionId":"TXN-ZERO","accountId":"%s","cardNumber":"%s",
+                                 "customerId":"%s","amount":0.00,"occurredAt":"2026-11-20T10:15:00"}
+                                """.formatted(ACCOUNT_ID, CARD_NUMBER, CUSTOMER_ID)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_AMOUNT"));
+    }
+
     private String rewardIdOf(MvcResult result) throws Exception {
         return objectMapper.readTree(result.getResponse().getContentAsString())
                 .get("grants").get(0).get("rewardId").asText();
