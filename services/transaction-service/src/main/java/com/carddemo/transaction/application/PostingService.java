@@ -23,8 +23,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 日终入账用例（CBTRN02C）。单笔拒付不中断整批（BR-POST-05/08）；同一交易号重复提交按幂等返回（NR-POST-01）。
@@ -45,6 +48,7 @@ public class PostingService {
     private final MarketingClient marketingClient;
     private final PostingPolicy postingPolicy;
     private final boolean marketingEnabled;
+    private final Set<String> rewardTypeCodes;
 
     public PostingService(TransactionRepository transactions,
                           DailyTransactionRepository dailyTransactions,
@@ -54,7 +58,8 @@ public class PostingService {
                           AccountClient accountClient,
                           MarketingClient marketingClient,
                           PostingPolicy postingPolicy,
-                          @Value("${marketing.enabled:true}") boolean marketingEnabled) {
+                          @Value("${marketing.enabled:true}") boolean marketingEnabled,
+                          @Value("${marketing.reward-type-codes:01}") String rewardTypeCodes) {
         this.transactions = transactions;
         this.dailyTransactions = dailyTransactions;
         this.balances = balances;
@@ -64,6 +69,10 @@ public class PostingService {
         this.marketingClient = marketingClient;
         this.postingPolicy = postingPolicy;
         this.marketingEnabled = marketingEnabled;
+        this.rewardTypeCodes = Arrays.stream(rewardTypeCodes.split(","))
+                .map(String::trim)
+                .filter(code -> !code.isEmpty())
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     public PostingResult post(List<PostingCommand> commands) {
@@ -134,9 +143,13 @@ public class PostingService {
     /**
      * 入账成功后尽力评估营销返现（docs/design/17-premium-cashback-campaign.md §3.3）：
      * 资金事实优先，营销调用失败只告警，不回滚已完成的入账。
+     * 仅消费类交易参与返现（REQ-dcf89122 D-07），类型集合由 marketing.reward-type-codes 配置。
      */
     private void evaluateRewards(TransactionRecord record, CardSnapshot card) {
         if (!marketingEnabled) {
+            return;
+        }
+        if (!rewardTypeCodes.contains(record.getTypeCode())) {
             return;
         }
         try {

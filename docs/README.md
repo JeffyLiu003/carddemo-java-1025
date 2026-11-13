@@ -30,6 +30,7 @@
 | [design/15-operations-support.md](design/15-operations-support.md) | P4：报表、通知、文档、工作流、审计、参考数据 |
 | [design/16-channel-and-quality.md](design/16-channel-and-quality.md) | P5/P6：BFF、搜索、门户、性能、混沌与安全 |
 | [design/17-premium-cashback-campaign.md](design/17-premium-cashback-campaign.md) | 高端卡返现活动：需求、影响、架构、Review 与测试 |
+| [design/18-platinum-extra-cashback-implementation.md](design/18-platinum-extra-cashback-implementation.md) | 白金卡额外 0.5% 返现：消费类交易过滤实现、覆盖矩阵与测试 |
 | [design/adr/README.md](design/adr/README.md) | 12 个架构决策记录（MADR） |
 
 ## 3. 运维
@@ -48,3 +49,4 @@
 | [requirements/REQ-2026-002-card-loss.md](requirements/REQ-2026-002-card-loss.md) | 信用卡挂失与补卡：自助挂失、补卡工单、进度 |
 | [requirements/REQ-2026-003-limit-increase.md](requirements/REQ-2026-003-limit-increase.md) | 额度调整申请与审批：预审、审批流、SoD |
 | [requirements/REQ-2026-004-dispute.md](requirements/REQ-2026-004-dispute.md) | 交易争议：在线申请、证据、临时入账、chargeback |
+| [requirements/REQ-2026-005-platinum-extra-cashback.md](requirements/REQ-2026-005-platinum-extra-cashback.md) | 白金卡额外 0.5% 消费返现：需求说明书（v1.0，决策 D-01～D-10） |

@@ -40,6 +40,7 @@ ledger:
 
 marketing:
   enabled: ${MARKETING_ENABLED:true}
+  reward-type-codes: ${MARKETING_REWARD_TYPE_CODES:01}
 
 management:
   endpoints:

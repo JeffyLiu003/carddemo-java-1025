@@ -119,6 +119,27 @@ class PostingServiceTest {
     }
 
     @Test
+    void nonPurchasePostingSkipsMarketingEvaluation() {
+        when(cardClient.findCard(CARD_NUMBER)).thenReturn(Optional.of(card));
+        when(accountClient.findAccount(ACCOUNT_ID)).thenReturn(Optional.of(account("5000.00")));
+        when(accountClient.applyPosting(eq(ACCOUNT_ID), any())).thenReturn(account("5000.00"));
+
+        PostingResult result = postingService.post(List.of(new PostingCommand(
+                "0000000000000106", CARD_NUMBER, "02", "0002", "POS TERM",
+                "Payment at Merchant A", new BigDecimal("75.00"),
+                LocalDateTime.of(2026, 10, 25, 10, 15), "800000001", "Merchant A", "Springfield", "10001")));
+
+        assertThat(result.status()).isEqualTo("COMPLETED");
+        assertThat(result.posted()).isEqualTo(1);
+        assertThat(result.rejected()).isZero();
+        assertThat(dailyStatus("0000000000000106")).isEqualTo("POSTED");
+        assertThat(balances.find(ACCOUNT_ID, "02", "0002")).get()
+                .extracting(TranCategoryBalance::getBalance)
+                .isEqualTo(new BigDecimal("75.00"));
+        verify(marketingClient, never()).evaluateRewards(any());
+    }
+
+    @Test
     void marketingFailureDoesNotRollBackPosting() {
         when(cardClient.findCard(CARD_NUMBER)).thenReturn(Optional.of(card));
         when(accountClient.findAccount(ACCOUNT_ID)).thenReturn(Optional.of(account("5000.00")));
