@@ -1,26 +1,11 @@
 # 文档索引
 
-## 1. 存量知识（As-Is）
+## 1. 目标设计（To-Be）
 
 | 文档 | 内容 |
 |---|---|
-| [legacy/01-codebase-inventory.md](legacy/01-codebase-inventory.md) | 44 个程序、copybook、数据存储、JCL、接口、风险量化 |
-| [legacy/02-five-level-model.md](legacy/02-five-level-model.md) | L1–L5 五层业务模型（每条事实带证据）、迁移影响、BCP、未解决项 |
-| [legacy/03-business-rule-catalog.md](legacy/03-business-rule-catalog.md) | 业务规则目录：遗留证据 → 目标落点 → 实现状态 |
-| [legacy/04-data-dictionary.md](legacy/04-data-dictionary.md) | 14 个逻辑实体的字段级数据字典与枚举 |
-| [legacy/05-ubiquitous-language.md](legacy/05-ubiquitous-language.md) | 统一语言词汇表、术语冲突与消歧 |
-
-## 2. 目标设计（To-Be）
-
-| 文档 | 内容 |
-|---|---|
-| [design/01-domain-analysis.md](design/01-domain-analysis.md) | 子域划分、聚合与不变量、领域服务/事件、语义差异 |
-| [design/02-bounded-contexts.md](design/02-bounded-contexts.md) | 27 个限界上下文的职责、边界、数据所有权 |
 | [design/03-service-decomposition.md](design/03-service-decomposition.md) | 服务拆分、调用矩阵、失败语义、部署与容量 |
-| [design/04-context-map.md](design/04-context-map.md) | 上下文映射图、集成契约、防腐层 |
 | [design/05-api-catalog.md](design/05-api-catalog.md) | 全部 REST 契约、种子数据契约、错误码总表 |
-| [design/06-traceability-matrix.md](design/06-traceability-matrix.md) | 遗留程序 → 服务 → 接口 → 规则 → 测试 |
-| [design/07-java-conventions.md](design/07-java-conventions.md) | 编码/分层/配置/测试统一基线 |
 | [design/09-scale-up-blueprint.md](design/09-scale-up-blueprint.md) | 规模化蓝图：现状基线、目标服务地图、七阶段路线图 |
 | [design/10-money-path-slice-a1.md](design/10-money-path-slice-a1.md) | 钱路径切片 A1：账户产品化、冻结、过账、总账与对账设计 |
 | [design/11-money-path-slice-a2.md](design/11-money-path-slice-a2.md) | 钱路径切片 A2：过账引擎、总账、试算平衡与前台 |
@@ -30,16 +15,16 @@
 | [design/15-operations-support.md](design/15-operations-support.md) | P4：报表、通知、文档、工作流、审计、参考数据 |
 | [design/16-channel-and-quality.md](design/16-channel-and-quality.md) | P5/P6：BFF、搜索、门户、性能、混沌与安全 |
 | [design/17-premium-cashback-campaign.md](design/17-premium-cashback-campaign.md) | 高端卡返现活动：需求、影响、架构、Review 与测试 |
-| [design/adr/README.md](design/adr/README.md) | 12 个架构决策记录（MADR） |
+| [design/adr/README.md](design/adr/README.md) | 4 个架构决策记录（MADR） |
 
-## 3. 运维
+## 2. 运维
 
 | 文档 | 内容 |
 |---|---|
 | [ops/01-docker-runbook.md](ops/01-docker-runbook.md) | 构建、启动、调试、排障、重置、安全缺口 |
 | [ops/02-security-and-performance.md](ops/02-security-and-performance.md) | NFR 目标、k6 压测、混沌/降级与安全收口 |
 
-## 4. 模拟需求（2026-10）
+## 3. 模拟需求（2026-10）
 
 | 文档 | 内容 |
 |---|---|

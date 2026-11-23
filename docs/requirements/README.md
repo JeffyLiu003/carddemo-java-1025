@@ -21,7 +21,7 @@
 ## 3. 共同假设
 
 1. 演示环境沿用现有 Spring Boot 3 / PostgreSQL / 原生 SPA 技术栈。
-2. 登录与角色沿用 IAM：普通用户 `U`、管理员 `A`；POC 不做接口级强鉴权（ADR-007）。
+2. 登录与角色沿用 IAM：普通用户 `U`、管理员 `A`；POC 不做接口级强鉴权。
 3. 金额统一 `BigDecimal`/`numeric(12,2)`；ID 采用现有零填充或 UUID 规范。
 4. 所有写接口必须支持去重键（接口字段 `idempotencyKey`）；关键操作写审计事件。
 5. 涉及账户余额的变更必须通过 account-service；涉及会计影响必须过账到 ledger-service。

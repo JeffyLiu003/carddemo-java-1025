@@ -1,6 +1,6 @@
 # API 目录（服务间契约）
 
-> 所有服务遵循 `docs/design/07-java-conventions.md`。基础路径 `/api/v1`，JSON，UTF-8。
+> 所有服务统一遵循同一编码、分层与配置约定。基础路径 `/api/v1`，JSON，UTF-8。
 > 面向业务人员的界面：`http://localhost:8090/`（web-ui 托管 SPA 并同源代理全部 `/api/**`）。
 > 每个服务提供 Swagger UI（根路径自动跳转）：`http://localhost:8081/` … `http://localhost:8087/`，
 > 登录请求体已预填 `ADMIN001/admin123`；OpenAPI 描述位于 `/v3/api-docs`。
@@ -97,7 +97,7 @@
 }
 ```
 
-- 用户号/密码统一 `trim` + 用户号大写；密码不做大小写转换（ADR-008）。
+- 用户号/密码统一 `trim` + 用户号大写；密码不做大小写转换（按原样比较）。
 - 失败统一 `401 INVALID_CREDENTIALS`（不区分用户不存在/密码错误）。
 - 缺参 `400 VALIDATION_FAILED`。
 
@@ -192,7 +192,7 @@
 
 ### 校验错误码
 
-`400 VALIDATION_FAILED`，`details` 保留遗留文案，例如 `stateCode: State: is not a valid state code`。
+`400 VALIDATION_FAILED`，`details` 保留原始文案，例如 `stateCode: State: is not a valid state code`。
 
 ---
 
@@ -728,7 +728,7 @@
 
 | code | HTTP | 归属 | 含义 |
 |---|---|---|---|
-| VALIDATION_FAILED | 400 | 全部 | 参数校验失败（`details` 给出字段与遗留文案） |
+| VALIDATION_FAILED | 400 | 全部 | 参数校验失败（`details` 给出字段与原始文案） |
 | INVALID_CREDENTIALS | 401 | iam | 用户号或密码错误 |
 | USER_NOT_FOUND | 404 | iam | 用户不存在 |
 | USER_ALREADY_EXISTS | 409 | iam | 用户号重复 |
