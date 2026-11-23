@@ -58,7 +58,7 @@ mvn -pl services/account-service test   # ArchUnit layering constraints
 
 | Risk | Current state | Action |
 |---|---|---|
-| A01 Broken access control | Resource services do not enforce token validation (ADR-007) | Connect an API gateway/OAuth2 before production; mTLS between services |
+| A01 Broken access control | Resource services do not enforce token validation | Connect an API gateway/OAuth2 before production; mTLS between services |
 | A02 Cryptographic failures | Local HTTP; PII in logs is not fully masked | Site-wide TLS; field-level encryption; log masking |
 | A03 Injection | Parameterized JPA; no string-concatenated SQL | Maintain; whitelist external queries |
 | A04 Insecure design | No rate limiting/replay protection; payments have no cut-off | Gateway rate limiting; idempotency keys already exist; add cut-off |

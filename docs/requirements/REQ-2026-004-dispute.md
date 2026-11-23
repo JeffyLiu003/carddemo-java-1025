@@ -448,7 +448,7 @@ Error code list:
 - Evidence files are managed by document-service and this service stores only metadata.
 - Amounts uniformly use `BigDecimal` / `numeric(12,2)`.
 - All write APIs support deduplication keys; provisional credit and closing must support deduplication (double validation through `creditId` and case status).
-- The demo environment reuses IAM roles `U`/`A`, and the POC does not perform strict API-level authorization (ADR-007), but case ownership validation must be retained.
+- The demo environment reuses IAM roles `U`/`A`, and the POC does not perform strict API-level authorization, but case ownership validation must be retained.
 
 ## 12. Risks and assumptions
 

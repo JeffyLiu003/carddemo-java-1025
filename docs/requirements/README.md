@@ -3,6 +3,7 @@
 > Purpose: support requirement review, scheduling, and front-end/back-end change demos.
 > Note: the following are **simulated requirements**; business metrics, fee rates, and turnaround times are all demo assumptions and do not constitute production compliance conclusions.
 > Baseline: `dev-b` (the marketing capability has been removed); the earlier premium card cashback design lives on branch `demo-b2` in `docs/design/17-premium-cashback-campaign.md`.
+> REQ-2026-005 re-introduces that capability as a narrower requirement scope (premium tiers only, one campaign type).
 
 ## 1. Requirement List
 
@@ -12,16 +13,18 @@
 | REQ-2026-002 | Credit card loss reporting and replacement | P0 | L2 | card, transaction, account, notification, audit | New loss reporting/replacement wizard on card details, progress timeline, back-office card production queue | R1 |
 | REQ-2026-003 | Credit card limit adjustment request and approval | P1 | L3 | limit, workflow, account, customer, notification, audit | Limit increase entry on the account page, request progress, back-office approval workbench | R2 |
 | REQ-2026-004 | Online transaction dispute request and handling | P1 | L3 | dispute, document, transaction, account, notification | Dispute entry on transaction details, evidence upload, case timeline, back-office case workbench | R2 |
+| REQ-2026-005 | Premium credit card spend cashback campaign | P2 | L3 | marketing (new), account, transaction, card, ledger, notification, audit | Customer campaign list/detail/cashback history, back-office campaign workbench, approval view, performance dashboard, failed-grant queue | R3 |
 
 ## 2. Scheduling Recommendations
 
 - **R1 (4–6 weeks)**: REQ-2026-001 and REQ-2026-002. Both directly change high-frequency customer pages and have clear back-end boundaries.
 - **R2 (4–6 weeks)**: REQ-2026-003 and REQ-2026-004. Both involve approval/case workbenches and cross-service state machines, so they are best done after R1 stabilizes.
+- **R3 (4–6 weeks)**: REQ-2026-005. It introduces a new bounded context plus cashback crediting on the money path, so it follows the R2 approval workbench and depends on the posting/credit capabilities stabilized in R1–R2.
 
 ## 3. Shared Assumptions
 
 1. The demo environment keeps the existing Spring Boot 3 / PostgreSQL / vanilla SPA technology stack.
-2. Login and roles reuse IAM: regular user `U`, administrator `A`; the POC does not enforce API-level authorization (ADR-007).
+2. Login and roles reuse IAM: regular user `U`, administrator `A`; the POC does not enforce API-level authorization.
 3. Amounts uniformly use `BigDecimal`/`numeric(12,2)`; IDs follow the existing zero-padding or UUID conventions.
 4. All write endpoints must support a deduplication key (API field `idempotencyKey`); key operations write audit events.
 5. Changes affecting account balances must go through account-service; changes with accounting impact must be posted to ledger-service.
@@ -39,7 +42,7 @@
 
 ## 5. Review Outputs
 
-All four requirement specifications follow the section structure of the BA requirement specification template (headings match the template):
+All five requirement specifications follow the section structure of the BA requirement specification template (headings match the template):
 
 | Section | Content |
 |---|---|
@@ -76,5 +79,6 @@ python3 ~/.config/opencode/skills/ba-requirement-analysis/scripts/ambiguity_chec
 | REQ-2026-002-card-loss.md | 100/100 | PASS | PASS | 0 |
 | REQ-2026-003-limit-increase.md | 100/100 | PASS | PASS | 0 |
 | REQ-2026-004-dispute.md | 100/100 | PASS | PASS | 0 |
+| REQ-2026-005-premium-campaign.md | 100/100 | PASS | PASS | 0 |
 
 Note: the script's ambiguous word list contains high-frequency fragment words such as the Chinese words for "etc.", "related", and "normal", so the document bodies were rewritten with concrete wording throughout (for example, "deduplication key" maps to `idempotencyKey`, and "value by card tier"); no `[to be confirmed]` placeholders are used, and open items are instead marked inline as "(to be confirmed: ...)" and collected in section 12.3 of each document.

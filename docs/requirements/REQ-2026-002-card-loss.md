@@ -418,7 +418,7 @@ Error code list:
 - Card number generation must comply with the card network BIN ranges and the Luhn check rule.
 - Amounts uniformly use `BigDecimal` / `numeric(12,2)`.
 - All write APIs support a deduplication key; key operations write audit events.
-- The demo environment keeps the IAM roles `U`/`A`; the POC does not enforce API-level authorization (ADR-007), but card ownership validation must be retained.
+- The demo environment keeps the IAM roles `U`/`A`; the POC does not enforce API-level authorization, but card ownership validation must be retained.
 
 ## 12. Risks and Assumptions
 

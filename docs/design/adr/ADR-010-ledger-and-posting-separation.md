@@ -53,7 +53,7 @@ Adopt Option B and implement:
 
 1. Money facts (account balances, posting batches) and the accounting projection (general ledger) have different failure domains; merging them would let reporting/period close block transactions.
 2. The general ledger needs to evolve independently (multi-currency, consolidated reports, audit), so a separate service boundary is more stable.
-3. Synchronous calls match the style of ADR-005, so the full chain can be demonstrated without introducing MQ; the idempotency keys are reserved for future Outbox replay.
+3. Synchronous calls match the project's cross-service consistency style (local transaction + synchronous call + idempotency key), so the full chain can be demonstrated without introducing MQ; the idempotency keys are reserved for future Outbox replay.
 
 ## Consequences (Impact and Rollback)
 

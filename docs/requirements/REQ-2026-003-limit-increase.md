@@ -434,7 +434,7 @@ Error code list:
 - The approval roles and permission matrix must be aligned with IAM/RBAC before go-live.
 - Amounts uniformly use `BigDecimal` / `numeric(12,2)`.
 - All write APIs support deduplication keys; approval decisions cannot be overwritten, only appended.
-- The demo environment reuses IAM roles `U`/`A`, and the POC does not perform strict API-level authorization (ADR-007), but SoD validation must be retained.
+- The demo environment reuses IAM roles `U`/`A`, and the POC does not perform strict API-level authorization, but SoD validation must be retained.
 
 ## 12. Risks and assumptions
 
