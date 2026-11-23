@@ -1,8 +1,8 @@
 # CardDemo Java Microservices Edition (carddemo-java-1025)
 
-Migrate AWS CardDemo (a CICS/COBOL credit card core demo system) into a Java microservices project built around **DDD bounded contexts**.
-This project does not translate COBOL line by line; instead it first extracts existing business knowledge (the L1–L5 five-level model + the business rule catalog),
-then splits 27 microservices along domain boundaries (6 existing business domains + marketing, general ledger, reconciliation, payment, billing, limit, FX, credit, risk, operations, and channel), and finally implements them with Spring Boot 3, providing a business-user-facing web UI and
+A Java microservices project for credit card core banking, built around **DDD bounded contexts**.
+The 27 services are split along domain boundaries (6 core business domains + marketing, general ledger, reconciliation, payment, billing, limit, FX, credit, risk, operations, and channel),
+implemented with Spring Boot 3, and shipped with a business-user-facing web UI plus
 Docker Compose debugging and run capability.
 
 ## 0. Current Code Baseline
@@ -17,7 +17,7 @@ Every row in the table below has been verified against the code on the `main` br
 | Databases | 25 separate databases (`bff` and `search` are stateless and have no database) |
 | Containers | 17 by default in Compose (15 microservices + web-ui + postgres); the `extended` profile adds 12 more |
 | Tests | All 818 test cases pass under `mvn test` (H2 + Flyway) |
-| Decisions | 12 ADRs (ADR-001–008 and 010–013; ADR-009 was removed with the legacy marketing module) |
+| Decisions | 4 ADRs (ADR-010–013) |
 | Latest capability | Term-based purchase cashback campaign for premium cards (marketing-service; see ADR-013 and `docs/design/17-premium-cashback-campaign.md`) |
 
 ## 1. Architecture Overview
@@ -101,36 +101,36 @@ graph LR
     MKT --> DB
 ```
 
-| Service | Port | Database | Corresponding legacy program |
-|---|---|---|---|
-| web-ui | 8090 → container 8080 | — (static SPA + proxy) | Corresponds to BMS screens (COSGN00C/COMEN01C/COADM01C, etc.) |
-| iam-service | 8081 | `carddemo_iam` | COSGN00C, COADM01C, COMEN01C, COUSR00C–03C |
-| customer-service | 8082 | `carddemo_customer` | CUSTDAT, CBCUS01C, COACTUPC (customer part) |
-| card-service | 8083 | `carddemo_card` | CARDDAT, CCXREF, COCRDLIC/SLC/UPC |
-| account-service | 8084 | `carddemo_account` | ACCTDAT, COACTVWC, COACTUPC (account part), CBTRN02C account segment, CBACT04C settlement, COBIL00C debit; adds product catalog, funds holds, and available credit |
-| transaction-service | 8085 | `carddemo_transaction` | TRANSACT, DALYTRAN, TCATBALF, CBTRN01C/02C/03C, CBACT04C, COBIL00C, COTRN00C/01C/02C, CORPT00C, COTRTLIC; adds posting engine (types/rules/batches/reversals) |
-| ledger-service | 8088 | `carddemo_ledger` | **New capability** (no general ledger in the legacy system): chart of accounts, double-entry journal entries, trial balance, period close |
-| reconciliation-service | 8089 | `carddemo_reconciliation` | **New capability**: reconciliation of posting batches ↔ general ledger journal entries, exception handling, EOD job entry point |
-| payment-service | 8091 | `carddemo_payment` | **New capability**: payment instruction intake, screening, settlement (posting), returns |
-| billing-service | 8092 | `carddemo_billing` | **New capability**: statement generation, interest/minimum payment, bill payment |
-| limit-service | 8093 | `carddemo_limit` | **New capability**: customer/account/channel limits, usage, and checks |
-| fx-service | 8094 | `carddemo_fx` | **New capability**: FX rate maintenance, quotes, conversion records |
-| marketing-service | 8087 | `carddemo_marketing` | **New capability**: term-based purchase cashback campaigns for premium cards (platinum/gold, 1–24 month campaigns, per-transaction/customer/budget caps, enrollment and performance dashboard) |
-| loan-service | 8095 | `carddemo_loan` | **New capability**: loan applications, approval, disbursement, equal principal-and-interest schedules, repayment |
-| fraud-service | 8096 | `carddemo_fraud` | **New capability**: fraud rule scoring, alerts, and case handling |
-| aml-service | 8097 | `carddemo_aml` | **New capability**: sanctions/watchlist screening, AML alerts |
-| dispute-service | 8098 | `carddemo_dispute` | **New capability**: dispute cases, provisional credit, chargeback |
-| collections-service | 8099 | `carddemo_collections` | **New capability**: delinquency buckets, promise to pay, case closure |
-| batch-service | 8100 | `carddemo_batch` | **New capability**: job definitions and EOD execution (interest accrual/reconciliation) |
-| reporting-service | 8101 | `carddemo_reporting` | **New capability**: transaction summaries, trial balance reports |
-| notification-service | 8102 | `carddemo_notification` | **New capability**: templates, notifications, and delivery status |
-| document-service | 8103 | `carddemo_document` | **New capability**: document metadata, text content, archiving |
-| workflow-service | 8104 | `carddemo_workflow` | **New capability**: process definitions, task approval/rejection |
-| audit-service | 8105 | `carddemo_audit` | **New capability**: append-only audit events and search |
-| reference-data-service | 8106 | `carddemo_reference` | **New capability**: currencies/countries/holidays/product categories |
-| bff-service | 8107 | — (stateless) | **New capability**: customer 360 aggregation |
-| search-service | 8108 | — (stateless) | **New capability**: unified customer/transaction search |
-| authorization-service | 8086 | `carddemo_authorization` | COPAUA0C, COPAUS0C/1C/2C, CBPAUP0C, IMS PAUTSUM0/PAUTDTL1, DB2 AUTHFRDS |
+| Service | Port | Database |
+|---|---|---|
+| web-ui | 8090 → container 8080 | — (static SPA + proxy) |
+| iam-service | 8081 | `carddemo_iam` |
+| customer-service | 8082 | `carddemo_customer` |
+| card-service | 8083 | `carddemo_card` |
+| account-service | 8084 | `carddemo_account` |
+| transaction-service | 8085 | `carddemo_transaction` |
+| ledger-service | 8088 | `carddemo_ledger` |
+| reconciliation-service | 8089 | `carddemo_reconciliation` |
+| payment-service | 8091 | `carddemo_payment` |
+| billing-service | 8092 | `carddemo_billing` |
+| limit-service | 8093 | `carddemo_limit` |
+| fx-service | 8094 | `carddemo_fx` |
+| marketing-service | 8087 | `carddemo_marketing` |
+| loan-service | 8095 | `carddemo_loan` |
+| fraud-service | 8096 | `carddemo_fraud` |
+| aml-service | 8097 | `carddemo_aml` |
+| dispute-service | 8098 | `carddemo_dispute` |
+| collections-service | 8099 | `carddemo_collections` |
+| batch-service | 8100 | `carddemo_batch` |
+| reporting-service | 8101 | `carddemo_reporting` |
+| notification-service | 8102 | `carddemo_notification` |
+| document-service | 8103 | `carddemo_document` |
+| workflow-service | 8104 | `carddemo_workflow` |
+| audit-service | 8105 | `carddemo_audit` |
+| reference-data-service | 8106 | `carddemo_reference` |
+| bff-service | 8107 | — (stateless) |
+| search-service | 8108 | — (stateless) |
+| authorization-service | 8086 | `carddemo_authorization` |
 
 ## 2. Directory Structure
 
@@ -144,8 +144,7 @@ carddemo-java-1025/
 ├── scripts/chaos-test.sh        # chaos/degradation check: postings still succeed with the ledger stopped
 ├── scripts/perf/k6-smoke.js     # k6 read-only load test (p95 < 800ms, error rate < 1%)
 ├── docs/
-│   ├── legacy/                  # legacy knowledge: inventory, five-level model, rule catalog, data dictionary, glossary
-│   ├── design/                  # DDD design: subdomains/contexts/decomposition/APIs/traceability matrix/ADRs
+│   ├── design/                  # DDD design: service decomposition, APIs, money path, blueprints, ADRs
 │   ├── requirements/            # simulated requirement packs: installment, card loss and replacement, limit increase approval, transaction dispute
 │   └── ops/                     # Docker runbook, security and performance hardening
 └── services/
@@ -231,31 +230,31 @@ k6 run scripts/perf/k6-smoke.js
 
 Open **http://localhost:8090/** (port 8080 on the host is taken by another program, hence the mapping to 8090; inside the container it is still 8080).
 
-| Page | Capability | Corresponding legacy screen/program |
-|---|---|---|
-| Login | Account pre-filled; switch between administrator and regular user | COSGN00C |
-| Home | Shows available feature entries by role | COMEN01C / COADM01C |
-| Account view | Combined account + customer + card display; product/limit/holds/available credit; create and release holds | COACTVWC |
-| Posting | Posting types, idempotent batches, debit and credit entries, reversals (new in the money path) | New capability |
-| General ledger | Chart of accounts, journal entries, trial balance, period close, manual entries (new in the money path) | New capability |
-| Reconciliation and EOD | Daily reconciliation, exception details and handling, EOD job history (administrator, new in the money path) | New capability |
-| Payment | Create payments, screening, acceptance, settlement, returns (new in P2) | New capability |
-| Billing | Generate statements, view interest/minimum payment/due date, pay in full (new in P2) | New capability |
-| Limit | Create/adjust limits, reserve/release, availability checks (administrator, new in P2) | New capability |
-| FX | FX rate maintenance, quotes, execute conversions, conversion records (new in P2) | New capability |
-| Premium cashback | Platinum/gold term campaigns, enrollment, purchase cashback, retry of failed cashback | New capability |
-| Cashback campaign | Create 1–24 month campaigns, product selection, publish/pause/end, performance (administrator) | New capability |
-| Customer 360 | BFF aggregates accounts/cards/customers/transactions/entitlements; unified search (new in P5) | New capability |
-| Loan | Application, approve/reject, disbursement, repayment schedule, repayment (new in P3) | New capability |
-| Risk | Fraud scoring/alerts, AML screening/alerts, disputes, collections (new in P3) | New capability |
-| Operations | Batch processing, reports, notifications, documents, workflow, audit, reference data (new in P4) | New capability |
-| Cards | Filter by account/customer, paging, details and maintenance (embossed name/status/expiry) | COCRDLIC / COCRDSLC / COCRDUPC |
-| Transaction query | Filter by transaction ID prefix/card number/account, paging, details | COTRN00C / COTRN01C |
-| Transaction entry | Linked type/category selection, full merchant details, auto-generated transaction ID | COTRN02C |
-| Bill payment | Look up amount due → confirm → pay in full and show the new balance | COBIL00C |
-| Transaction reports | Statistics for a date range, range totals, totals by card | CORPT00C / CBTRN03C |
-| Authorization management | Pending authorization summary, details, mark as fraud, expiry cleanup | COPAUS0C/1C/2C, CBPAUP0C |
-| User management | List, create, edit, delete (administrator only) | COUSR00C–03C |
+| Page | Capability |
+|---|---|
+| Login | Account pre-filled; switch between administrator and regular user |
+| Home | Shows available feature entries by role |
+| Account view | Combined account + customer + card display; product/limit/holds/available credit; create and release holds |
+| Posting | Posting types, idempotent batches, debit and credit entries, reversals (new in the money path) |
+| General ledger | Chart of accounts, journal entries, trial balance, period close, manual entries (new in the money path) |
+| Reconciliation and EOD | Daily reconciliation, exception details and handling, EOD job history (administrator, new in the money path) |
+| Payment | Create payments, screening, acceptance, settlement, returns (new in P2) |
+| Billing | Generate statements, view interest/minimum payment/due date, pay in full (new in P2) |
+| Limit | Create/adjust limits, reserve/release, availability checks (administrator, new in P2) |
+| FX | FX rate maintenance, quotes, execute conversions, conversion records (new in P2) |
+| Premium cashback | Platinum/gold term campaigns, enrollment, purchase cashback, retry of failed cashback |
+| Cashback campaign | Create 1–24 month campaigns, product selection, publish/pause/end, performance (administrator) |
+| Customer 360 | BFF aggregates accounts/cards/customers/transactions/entitlements; unified search (new in P5) |
+| Loan | Application, approve/reject, disbursement, repayment schedule, repayment (new in P3) |
+| Risk | Fraud scoring/alerts, AML screening/alerts, disputes, collections (new in P3) |
+| Operations | Batch processing, reports, notifications, documents, workflow, audit, reference data (new in P4) |
+| Cards | Filter by account/customer, paging, details and maintenance (embossed name/status/expiry) |
+| Transaction query | Filter by transaction ID prefix/card number/account, paging, details |
+| Transaction entry | Linked type/category selection, full merchant details, auto-generated transaction ID |
+| Bill payment | Look up amount due → confirm → pay in full and show the new balance |
+| Transaction reports | Statistics for a date range, range totals, totals by card |
+| Authorization management | Pending authorization summary, details, mark as fraud, expiry cleanup |
+| User management | List, create, edit, delete (administrator only) |
 
 | Demo account | Password | Type |
 |---|---|---|
@@ -304,7 +303,7 @@ The request body of the login endpoint `POST /api/v1/auth/login` already contain
 transactions, authorization, bill payment, postings, and interest are also pre-filled with real demo data. OpenAPI descriptions are generated from code annotations.
 
 > Note: Swagger UI is a **per-service** API console; the web UI (8090) is the unified entry point for business users.
-> The POC does not enforce token validation (ADR-007), so both entry points should only be used on the local machine or an isolated network.
+> The POC does not enforce token validation, so both entry points should only be used on the local machine or an isolated network.
 
 ## 4. Key Business Scenarios (curl)
 
@@ -314,7 +313,7 @@ curl -s -X POST localhost:8081/api/v1/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"userId":"admin001","password":"admin123"}'
 
-# account / customer / card (combine into the legacy COACTVWC view)
+# account / customer / card (combined account view)
 curl -s localhost:8084/api/v1/accounts/00000000001
 curl -s localhost:8082/api/v1/customers/000000001
 curl -s localhost:8083/api/v1/cards/by-account/00000000001
@@ -355,14 +354,14 @@ curl -s -X POST localhost:8089/api/v1/eod-runs \
 
 ## 5. Design Highlights
 
-- **Bounded contexts first**: accounts and customers are no longer updated in the same transaction (legacy `COACTUPC` covered two
-  aggregates on one screen); bill payment is orchestrated by transaction-service and executed by account-service, while the authorization context independently owns pending authorization summaries. See ADR-001/004.
+- **Bounded contexts first**: accounts and customers are owned by their own services instead of being updated through one combined screen flow;
+  bill payment is orchestrated by transaction-service and executed by account-service, while the authorization context independently owns pending authorization summaries.
 - **Zero-padded string identifiers + BigDecimal**: `accountId` is 11 digits, `cardNumber` 16 digits, `customerId` 9 digits, and
-  `transactionId` 16 digits; all amounts use `numeric(12,2)`. See ADR-002.
+  `transactionId` 16 digits; all amounts use `numeric(12,2)`.
 - **One database per service**: cross-database JOINs are forbidden and cross-domain access goes through REST only; a downstream 404 means "does not exist" and a 5xx/timeout means "cannot determine" (fail closed).
-- **Optimistic locking instead of record locks**: `@Version` replaces `READ UPDATE` plus snapshot comparison, and conflicts return 409. See ADR-006.
+- **Optimistic locking instead of record locks**: `@Version` protects concurrent updates and conflicts return `409 CONCURRENT_UPDATE`.
 - **Defect fixes** (all documented and tested): the CVV is no longer overwritten by card maintenance, expiring authorization cleanup releases the credit balance,
-  available credit deducts both the account balance owed and authorization holds, and passwords are stored with PBKDF2. See `NR-*` in the rule catalog.
+  available credit deducts both the account balance owed and authorization holds, and passwords are stored with PBKDF2.
 - **Posting and general ledger (new)**: posting batches generate debit and credit entries from type rules; account balance changes and entries share the same transaction, while general ledger synchronization is best effort;
   reversals create a reversing batch and keep the original record; the general ledger is idempotent on `(sourceType, sourceId)`, and the trial balance and period close are queryable.
   See `docs/design/11-money-path-slice-a2.md`.
@@ -378,13 +377,7 @@ curl -s -X POST localhost:8089/api/v1/eod-runs \
 | Entry point | Description |
 |---|---|
 | [docs/README.md](docs/README.md) | Full documentation index |
-| [docs/legacy/02-five-level-model.md](docs/legacy/02-five-level-model.md) | L1–L5 business model (with evidence) |
-| [docs/legacy/03-business-rule-catalog.md](docs/legacy/03-business-rule-catalog.md) | Business rule → implementation landing point → status |
-| [docs/design/02-bounded-contexts.md](docs/design/02-bounded-contexts.md) | 27 bounded contexts |
-| [docs/design/04-context-map.md](docs/design/04-context-map.md) | Context map, integration contracts, and anti-corruption layers |
 | [docs/design/05-api-catalog.md](docs/design/05-api-catalog.md) | All API contracts and seed data |
-| [docs/design/06-traceability-matrix.md](docs/design/06-traceability-matrix.md) | Where the 44 legacy programs went (general ledger/reconciliation/payment/billing are new capabilities) |
-| [docs/design/07-java-conventions.md](docs/design/07-java-conventions.md) | Unified baseline for coding, layering, configuration, and testing |
 | [docs/design/09-scale-up-blueprint.md](docs/design/09-scale-up-blueprint.md) | Scale-up blueprint and phased roadmap |
 | [docs/design/10-money-path-slice-a1.md](docs/design/10-money-path-slice-a1.md) | A1: account productization, holds, available credit |
 | [docs/design/11-money-path-slice-a2.md](docs/design/11-money-path-slice-a2.md) | A2: posting engine, general ledger, trial balance, and front end |
@@ -394,7 +387,7 @@ curl -s -X POST localhost:8089/api/v1/eod-runs \
 | [docs/design/15-operations-support.md](docs/design/15-operations-support.md) | P4: reports, notifications, documents, workflow, audit, reference data |
 | [docs/design/16-channel-and-quality.md](docs/design/16-channel-and-quality.md) | P5/P6: BFF, search, portal, performance, chaos, and security |
 | [docs/design/17-premium-cashback-campaign.md](docs/design/17-premium-cashback-campaign.md) | Premium card cashback campaign: requirements, impact, architecture, review, and tests |
-| [docs/design/adr/README.md](docs/design/adr/README.md) | 12 architecture decisions (ADR-001–008 and 010–013) |
+| [docs/design/adr/README.md](docs/design/adr/README.md) | 4 architecture decisions (ADR-010–013) |
 | [docs/ops/01-docker-runbook.md](docs/ops/01-docker-runbook.md) | Docker debug runbook |
 | [docs/ops/02-security-and-performance.md](docs/ops/02-security-and-performance.md) | Security, performance (k6), chaos, and quality hardening |
 | [docs/requirements/README.md](docs/requirements/README.md) | Simulated requirement pack index (priority, depth level, and scheduling recommendations) |
@@ -405,11 +398,11 @@ curl -s -X POST localhost:8089/api/v1/eod-runs \
 
 ## 7. Known Limitations (POC Scope)
 
-1. **Authorization is not enforced**: iam issues HMAC tokens, but validation on the resource side is left to a gateway (ADR-007);
+1. **Authorization is not enforced**: iam issues HMAC tokens, but validation on the resource side is left to a gateway;
    neither the web UI (8090) nor the service ports may be exposed to the internet.
-2. **No distributed transactions**: bill payment/posting use "local transaction + synchronous call + idempotency key"; see ADR-005 for Saga/Outbox.
-3. **Reports migrate the data semantics only**, not the 133-byte print layout; statements, branch migration, and MQ adapters are deferred.
-4. **Seed data is normalized sample data**: the legacy ASCII data contains EBCDIC overpunch characters, so a real migration must decode it according to the data dictionary.
+2. **No distributed transactions**: bill payment/posting use "local transaction + synchronous call + idempotency key"; see `docs/design/03-service-decomposition.md` §5 for the consistency notes.
+3. **Reports provide data semantics only**: no statement/print layouts, branch migration, or MQ adapters are implemented.
+4. **Seed data is normalized sample data**: it is not decoded from any production extract, so a real migration would need its own decoding and validation step.
 5. Concurrent authorization on a single account uses optimistic locking, so hot accounts need retries; a k6 read-only load test is provided (`scripts/perf/k6-smoke.js`,
    NFR targets in `docs/ops/02-security-and-performance.md`), while partition and write-path load tests are still pending (open item U1).
 6. **The general ledger is a new capability**: postings call it synchronously afterwards, failures only raise alerts (with an empty `ledgerEntryId`), and there is no Outbox retry yet;

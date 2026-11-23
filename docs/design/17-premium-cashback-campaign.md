@@ -1,7 +1,7 @@
 # 17 Premium Credit Card Term Cashback Campaign Capability
 
 > Status: design complete, moving into implementation
-> Reference: the removed legacy marketing module (08/ADR-009); this design re-scopes it into a narrow "premium card + term campaign + purchase cashback" capability
+> Reference: the previously removed marketing module; this design re-scopes it into a narrow "premium card + term campaign + purchase cashback" capability
 
 ## 1. Requirements and Acceptance Criteria
 
@@ -35,7 +35,7 @@ Targeting value customers such as platinum cardholders, launch a "cashback on pu
 | Interfaces | New campaign/enrollment/eligibility/evaluation/reward/performance APIs; account gains `POST /accounts/{id}/credits` |
 | Configuration | transaction gains `MARKETING_SERVICE_URL/MARKETING_ENABLED`; web-ui gains proxy entries; Compose gains the marketing container |
 | Documentation | This design and ADR-013 are new; README/service inventory/API catalog/runbook/smoke script are updated |
-| Security | Same as the legacy module: the POC does not enforce authentication; the cashback API requires an idempotency key; amounts/rates are boundary-validated |
+| Security | Same as the earlier marketing module: the POC does not enforce authentication; the cashback API requires an idempotency key; amounts/rates are boundary-validated |
 | Compatibility | The account credit is a new endpoint and does not change existing repayment/posting semantics; the old `reward_credit` is removed in favor of the new `account_credit` |
 
 ## 3. Architecture Design

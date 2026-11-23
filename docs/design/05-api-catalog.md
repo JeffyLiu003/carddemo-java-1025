@@ -1,6 +1,6 @@
 # API Catalog (Service-to-Service Contracts)
 
-> All services follow `docs/design/07-java-conventions.md`. Base path `/api/v1`, JSON, UTF-8.
+> All services use the shared four-layer layout (`interfaces/rest` → `application` → `domain` → `infrastructure`). Base path `/api/v1`, JSON, UTF-8.
 > Business-facing UI: `http://localhost:8090/` (web-ui hosts the SPA and same-origin proxies all `/api/**`).
 > Each service provides Swagger UI (the root path redirects automatically): `http://localhost:8081/` … `http://localhost:8087/`;
 > the login request body is pre-filled with `ADMIN001/admin123`; the OpenAPI description lives at `/v3/api-docs`.
@@ -97,7 +97,7 @@ Transaction seed (`transaction`, ascending by transaction number):
 }
 ```
 
-- User ID/password are both `trim`med and the user ID is upper-cased; the password is not case-normalized (ADR-008).
+- User ID/password are both `trim`med and the user ID is upper-cased; the password is not case-normalized.
 - Failures uniformly return `401 INVALID_CREDENTIALS` (no distinction between an unknown user and a wrong password).
 - Missing parameters → `400 VALIDATION_FAILED`.
 
@@ -192,7 +192,7 @@ Same fields as POST (`customerId` comes from the path; `ssn` is optional and omi
 
 ### Validation Error Codes
 
-`400 VALIDATION_FAILED`; `details` preserves the legacy message, for example `stateCode: State: is not a valid state code`.
+`400 VALIDATION_FAILED`; `details` keeps the original message text, for example `stateCode: State: is not a valid state code`.
 
 ---
 
@@ -727,7 +727,7 @@ Account credit: `POST /api/v1/accounts/{accountId}/credits`
 
 | code | HTTP | Owner | Meaning |
 |---|---|---|---|
-| VALIDATION_FAILED | 400 | All | Parameter validation failed (`details` gives the field and the legacy message) |
+| VALIDATION_FAILED | 400 | All | Parameter validation failed (`details` gives the field and the message) |
 | INVALID_CREDENTIALS | 401 | iam | Invalid user ID or password |
 | USER_NOT_FOUND | 404 | iam | User does not exist |
 | USER_ALREADY_EXISTS | 409 | iam | Duplicate user ID |

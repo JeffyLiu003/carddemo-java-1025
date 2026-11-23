@@ -42,7 +42,7 @@ Adopt Option B with the following constraints:
 - Transactions still succeed when marketing is unavailable, and cashback may be delayed; PENDING rewards can be retried manually.
 - Budget/cap enforcement is currently single-instance only; multiple instances require row locks or conditional updates (already listed as a risk).
 - The account credit API is a generic capability that can be reused by other benefit scenarios.
-- The old `08-marketing-capability.md` and ADR-009 are not restored; the new design follows this ADR and document 17.
+- The earlier marketing design is not restored; the new design follows this ADR and document 17.
 
 ## Evidence
 

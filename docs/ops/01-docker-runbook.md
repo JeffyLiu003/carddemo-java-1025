@@ -188,12 +188,12 @@ docker compose up -d --build
 
 ## 7. Known Security Gaps (must be understood)
 
-1. **Resource services do not enforce token validation** (ADR-007): ports 8081–8108 are equivalent to trusted intranet calls.
+1. **Resource services do not enforce token validation**: ports 8081–8108 are equivalent to trusted intranet calls.
    This is for local/isolated-network demos only; never expose them to the internet or use them in production.
 2. Before production: connect an API gateway for unified authentication (OAuth2/OIDC), enable mTLS between services, use a secret manager
    (`IAM_TOKEN_SECRET` must not keep its default value), and add audit logging and rate limiting.
 3. Seed passwords are for demo only (`ADMIN001/admin123`, `USER0001/user1234`) and must be reset before going live.
-4. Following legacy semantics, the authorization endpoint only evaluates "limit/status" and does not integrate fraud lists or merchant risk controls (U4).
+4. Following the original semantics, the authorization endpoint only evaluates "limit/status" and does not integrate fraud lists or merchant risk controls (U4).
 
 ## 8. Verification Record (this delivery)
 

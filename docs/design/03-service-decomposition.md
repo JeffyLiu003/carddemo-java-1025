@@ -110,7 +110,7 @@ Call counts (per business operation):
 
 ## 5. Consistency and Idempotency
 
-- Bill payment: `transaction` persists first (PENDING) → calls `account /payments` → sets POSTED; a failure rolls back the local transaction (ADR-005).
+- Bill payment: `transaction` persists first (PENDING) → calls `account /payments` → sets POSTED; a failure rolls back the local transaction (local transaction + synchronous call + idempotency key).
 - Posting: a single failure is recorded as `REJECTED` + reason code and the whole batch continues; returns `COMPLETED_WITH_REJECTS`.
 - Idempotency keys: `transactionId` (posting/entry); `cardNumber + authTimestamp` maps to `authorizationId` (authorization);
   `idempotencyKey` (posting batch); `(sourceType, sourceId)` (general ledger journal entry).

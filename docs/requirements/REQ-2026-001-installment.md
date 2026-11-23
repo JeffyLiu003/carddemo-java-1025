@@ -448,7 +448,7 @@ Error code list:
 ### 12.2 Assumptions
 
 - The demo environment keeps the existing Spring Boot 3 / PostgreSQL stack and the IAM roles `U`/`A`.
-- The POC does not enforce API-level authorization (ADR-007), but account ownership validation must be retained.
+- The POC does not enforce API-level authorization, but account ownership validation must be retained.
 
 ### 12.3 Items to Be Confirmed
 

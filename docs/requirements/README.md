@@ -21,7 +21,7 @@
 ## 3. Shared Assumptions
 
 1. The demo environment keeps the existing Spring Boot 3 / PostgreSQL / vanilla SPA technology stack.
-2. Login and roles reuse IAM: regular user `U`, administrator `A`; the POC does not enforce API-level authorization (ADR-007).
+2. Login and roles reuse IAM: regular user `U`, administrator `A`; the POC does not enforce API-level authorization.
 3. Amounts uniformly use `BigDecimal`/`numeric(12,2)`; IDs follow the existing zero-padding or UUID conventions.
 4. All write endpoints must support a deduplication key (API field `idempotencyKey`); key operations write audit events.
 5. Changes affecting account balances must go through account-service; changes with accounting impact must be posted to ledger-service.
