@@ -63,7 +63,7 @@
 
 ## 5. 一致性与幂等
 
-- 账单支付：`transaction` 先落库（PENDING）→ 调 `account /payments` → 置 POSTED；失败回滚本地事务（ADR-005）。
+- 账单支付：`transaction` 先落库（PENDING）→ 调 `account /payments` → 置 POSTED；失败回滚本地事务（同步调用 + 幂等键）。
 - 入账：单笔失败记 `REJECTED` + 原因码，整批继续；返回 `COMPLETED_WITH_REJECTS`。
 - 幂等键：`transactionId`（入账/录入）；`cardNumber + authTimestamp` 对应 `authorizationId`（授权）。
 - 对账：日终以 `transaction` 为权威，`account.current_balance` 与"初始余额 + Σ入账 − Σ还款 + Σ利息"比对。
