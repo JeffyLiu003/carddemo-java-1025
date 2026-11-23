@@ -58,7 +58,7 @@ mvn -pl services/account-service test   # ArchUnit 分层约束
 
 | 风险 | 现状 | 处置 |
 |---|---|---|
-| A01 访问控制 | 资源服务未强制校验 token（ADR-007） | 生产前接 API 网关/OAuth2；服务间 mTLS |
+| A01 访问控制 | 资源服务未强制校验 token | 生产前接 API 网关/OAuth2；服务间 mTLS |
 | A02 加密失败 | 本地 HTTP；PII 日志未全量脱敏 | 全站 TLS；字段级加密；日志脱敏 |
 | A03 注入 | JPA 参数化；无字符串拼接 SQL | 保持；对外部查询做白名单 |
 | A04 不安全设计 | 无限流/防重放；支付无 cut-off | 网关限流；幂等键已有；补 cut-off |
